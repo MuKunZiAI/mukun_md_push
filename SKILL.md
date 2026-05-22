@@ -1,33 +1,72 @@
 ---
-name: mukun_md_push_wechat
-description: 针对输入的Markdown文件，可以转换为符合微信公众号规范的html文件，还可以进一步将转换后成果直接推送到微信公众号的草稿箱。
+name: mukun-md-push-wechat
+description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持日报模式（默认）、长文/历史故事模式（--essay）、AI 文章模式（--ai）。当用户提到"md转微信html""推送公众号""转换微信公众号格式"等意图时触发此技能。
+allowed-tools: Read, Bash, Write
 ---
 
-# Markdown文件转换成符合微信公众号规范的html文件并推送到公众号草稿箱
+# Markdown 转微信公众号 HTML 并推送草稿箱
 
-## 主要技能
-- 技能1. 将Markdown文件转换为符合微信公众号规范的html文件，确保转换后的html样式能够被微信公众号正常渲染，本技能可以转换的MD格式包括各级标题、正文内容、表格、代码块、引用块等范围。
-- 技能2. 在技能1的基础上，还能够按微信公众号平台的接口规范，将转换后的html内容推送到微信公众号草稿箱
+## 核心能力
 
-## 适用场景决策树
-| 用户说什么 | 走哪个能力 | 用什么工具 |
-|------|------|------|
-| 「把这篇md转成微信html」「md转微信格式」「基于md生成微信html」「生成微信html」 | **技能1** | `scripts/md2wechat_html.py`（包含3套模版） |
-| 「把这篇mdt推送/发布到公众号」「先转换/生成微信html再推送到公众号」「推送公众号草稿箱」 | **技能2** | `scripts/push_daily.py`（包含技能1） |
+将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，支持三级标题、正文、粗体、链接、行内代码、代码块、引用块、表格等常用格式。所有 CSS 内联到 style 属性，确保微信渲染兼容。
 
-**决策原则**：技能2是包含技能1的，如果用户只是要转换成微信html，则只需要调用技能1，如果既要转换成微信html又要推送到公众号草稿箱，则只需要调用技能2，不需要同时调用技能1 和技能2。
+支持进一步将转换后的 HTML 推送到微信公众号草稿箱。
 
+## 场景决策
 
-## 技能1 实现逻辑
-直接调用 `scripts/md2wechat_html.py` 脚本，将输入的md文件转换为符合微信公众号规范的html文件，并保存在当前工作目录下
-支持三种转换模式：
-默认AI日报模式，一条消息对应一条新闻，有新闻标题和简要描述，有标注来源和日期，总体分为固定四大板块
-长文/历史故事模式，整体是泛黄报纸风格背景，对应参数是“--essay”
-AI类文章模式，白底灰字 + 棕色标签二级标题 + 固定尾栏内容，对应参数是“--ai”
+| 用户意图 | 执行方式 | 脚本命令 |
+|---------|---------|---------|
+| 「把这篇md转成微信html」「md转微信格式」「生成微信html」 | 仅转换 HTML | `${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py` |
+| 「推送/发布到公众号」「先转换再推送到公众号」 | 转换 + 推送草稿箱 | `${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py` |
 
-## 技能2 实现逻辑
-调用 `scripts/push_daily.py` 脚本， 将输入的md文件转换为符合微信公众号规范的html文件，并将转换后的html文件内容上传到微信公众号草稿箱
-其中转换html的过程和技能1 完全一致，也支持三种转换模式，对应参数也完全一致
+**决策原则**：技能 2（推送）已包含技能 1（转换），无需同时调用两者。
 
-## 使用前检查
-技能2 使用前需要检查当前环境中，是否存在公众号配置信息文件 `~/.md_push_wechat/config.yaml`，如果不存在，则不允许执行本Skill，强制中断，不要尝试从其他目录查找，并提示相应错误
+## 技能 1：Markdown → 微信 HTML
+
+调用脚本：
+```bash
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py <input.md> [output.html]
+```
+
+三种转换模式：
+- **日报模式（默认）**：一条消息对应一条新闻，分四大板块，报纸风格配色
+- **长文/历史故事模式（`--essay`）**：泛黄报纸风格背景，适合成语典故、历史故事类长文
+- **AI 文章模式（`--ai`）**：白底灰字 + 棕色标签二级标题 + 固定尾栏，适合 AI 实践类文章
+
+示例：
+```bash
+# 日报模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py article.md article_wechat.html
+
+# 长文模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --essay story.md story_wechat.html
+
+# AI文章模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --ai ai_article.md ai_wechat.html
+```
+
+输出 HTML 文件保存在当前工作目录。若未指定 output.html，则根据模式自动生成文件名后缀（`_wechat.html`、`_essay_wechat.html`、`_ai_wechat.html`）。
+
+## 技能 2：转换 + 推送草稿箱
+
+调用脚本：
+```bash
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER]
+```
+
+支持 Markdown frontmatter 提取标题和摘要：
+```yaml
+---
+title: 文章标题
+digest: 手动摘要（80字以内）
+---
+```
+
+完整工作流：Markdown → HTML（复用技能1） → 上传封面图 → 推送草稿箱。
+
+## 前置检查
+
+- 技能 1：无前置依赖
+- 技能 2（推送草稿箱）：执行前**必须**确认配置文件 `~/.md_push_wechat/config.yaml` 存在。若不存在，**立即中断**，提示用户创建配置文件并填写 `appid` 和 `secret`，不得尝试从其他目录查找或自动创建。
