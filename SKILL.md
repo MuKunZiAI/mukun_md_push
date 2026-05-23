@@ -51,9 +51,9 @@ python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --ai ai_article.md ai_w
 
 调用脚本：
 ```bash
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER] [--media-id MEDIA_ID]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER] [--media-id MEDIA_ID]
 ```
 
 支持 Markdown frontmatter 提取标题和摘要：
@@ -65,6 +65,24 @@ digest: 手动摘要（80字以内）
 ```
 
 完整工作流：Markdown → HTML（复用技能1） → 上传封面图 → 推送草稿箱。
+
+**自动拆分**：当 HTML 内容超过 20000 字符限制时，脚本会自动按 H2 标题拆分为多篇合并推送（同一图文消息内，读者上滑查看），标题自动添加（上）（中）（下）后缀。
+
+## CSS 内联优化策略（字符节省）
+
+微信公众号草稿接口有 **20000 字符限制**。脚本采用以下 CSS 继承策略压缩输出体积：
+
+- **`text-indent:0`** 统一写到 `<body style>` 一次，全文继承，各 `<p>/<h2>/<h3>` 不再重复（`text-indent` 是可继承属性）
+- **`color` / `font-size` / `line-height`** 提升到最近父级 `<section>`，子元素只保留差异化覆盖
+- **`<td>` 的 `color`** 从 `<body>` 继承，不在每个 `td` 重复
+- **空格规范**：style 属性内一律去掉冒号/分号后的空格，进一步节省
+
+实测节省效果（示例文件）：
+| 模式 | 优化前 | 优化后 | 节省 |
+|------|--------|--------|------|
+| 日报 | 9,324 字符 | 8,352 字符 | 972 字符 (10.4%) |
+| AI文章 | 9,527 字符 | 9,101 字符 | 426 字符 (4.5%) |
+| 长文 | 3,366 字符 | 3,156 字符 | 210 字符 (6.2%) |
 
 ## 前置检查
 

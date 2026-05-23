@@ -28,6 +28,9 @@ import re
 import sys
 import os
 
+# ─── 配置路径（默认，可通过 --config 覆盖）──────────────
+CONFIG_PATH = os.path.join(os.path.expanduser("~/.md_push_wechat"), "config.yaml")
+
 # ─── 报纸风格配色 ──────────────────────────────────────
 PAPER_BG      = "#f6f1e7"    # 报纸底色：泛黄暖白
 PAPER_CARD    = "#faf7f0"    # 卡片底色：略浅的黄白
@@ -55,43 +58,48 @@ SECTION_COLORS = {
 # ─── HTML 模板（报纸风格，微信兼容） ────────────────────
 # 使用 __PLACEHOLDER__ 避免与后续 .format() 的 {title} 等冲突
 
-HTML_TEMPLATE = """<!DOCTYPE html>
+_DAILY_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 </head>
-<body style="margin: 0; padding: 24px 16px; background: __PAPER_BG__; font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+<body style="margin:0;padding:24px 16px;background:__BG__;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-indent:0">
 
 <!-- 封面标题区：报纸报头风格 -->
-<section style="background: __PAPER_HERO_BG__; padding: 24px 20px 20px; margin: 0 0 6px 0; border-top: 4px solid #c4a882">
-  <p style="margin: 0 0 10px 0; font-size: 11px; color: #c4a882; letter-spacing: 2px; text-align: center; text-indent: 0">AI WEEKLY REVIEW</p>
-  <h1 style="margin: 0; font-size: 22px; font-weight: bold; color: #faf7f0; line-height: 1.5; text-align: center; border: none">{title}</h1>
+<section style="background:__HERO_BG__;padding:24px 20px 20px;margin:0 0 6px 0;border-top:4px solid __RULE__">
+  <p style="margin:0 0 10px 0;font-size:11px;color:__RULE__;letter-spacing:2px;text-align:center">AI WEEKLY REVIEW</p>
+  <h1 style="margin:0;font-size:__TITLE_FONT_SIZE__;font-weight:bold;color:#faf7f0;line-height:1.5;text-align:center;border:none">{title}</h1>
 </section>
 
 <!-- 信息来源栏：报头下的日期/来源 -->
-<section style="background: __PAPER_CARD__; padding: 10px 16px; margin: 0 0 24px 0; border: 1px solid __PAPER_RULE__; border-top: none">
-  <p style="margin: 0; font-size: 12px; color: __PAPER_MUTED__; line-height: 1.7; text-align: center; text-indent: 0; letter-spacing: 0.5px">{meta}</p>
+<section style="background:__CARD__;padding:10px 16px;margin:0 0 24px 0;border:1px solid __RULE__;border-top:none">
+  <p style="margin:0;font-size:12px;color:__MUTED__;line-height:1.7;text-align:center;letter-spacing:0.5px">{meta}</p>
 </section>
 
 {content}
 
 <!-- 底部说明：报尾 -->
-<section style="border-top: 2px solid __PAPER_RULE__; margin: 24px 0 0 0; padding: 12px 0 0 0; text-align: center">
-  <p style="margin: 0; font-size: 11px; color: __PAPER_CAPTION__; text-indent: 0; letter-spacing: 1px">{footer}</p>
+<section style="border-top:2px solid __RULE__;margin:24px 0 0 0;padding:12px 0 0 0;text-align:center">
+  <p style="margin:0;font-size:11px;color:__CAPTION__;letter-spacing:1px">{footer}</p>
 </section>
 
 </body>
 </html>"""
 
-# 预替换颜色占位符，使模板可安全用于后续 .format({title}...)
-for _name, _val in [
-    ("PAPER_BG", PAPER_BG), ("PAPER_CARD", PAPER_CARD),
-    ("PAPER_DARK", PAPER_DARK), ("PAPER_HEADING", PAPER_HEADING),
-    ("PAPER_ACCENT", PAPER_ACCENT), ("PAPER_RULE", PAPER_RULE),
-    ("PAPER_MUTED", PAPER_MUTED), ("PAPER_CAPTION", PAPER_CAPTION),
-    ("PAPER_HERO_BG", PAPER_HERO_BG), ("PAPER_TABLE_BG", PAPER_TABLE_BG),
-]:
-    HTML_TEMPLATE = HTML_TEMPLATE.replace(f"__{_name}__", _val)
+
+def _build_daily_template(s):
+    """用样式配置 s 替换日报模板占位符，返回可 .format() 的模板字符串"""
+    t = _DAILY_TEMPLATE
+    for name, val in [
+        ("BG", s["bg"]), ("CARD", s["card"]),
+        ("DARK", s["dark"]), ("HEADING", s["heading"]),
+        ("ACCENT", s["accent"]), ("RULE", s["rule"]),
+        ("MUTED", s["muted"]), ("CAPTION", s["caption"]),
+        ("HERO_BG", s["hero_bg"]), ("TABLE_BG", s["table_bg"]),
+        ("TITLE_FONT_SIZE", s["title_font_size"]),
+    ]:
+        t = t.replace(f"__{name}__", val)
+    return t
 
 
 # ─── 解析 Markdown ─────────────────────────────────────
@@ -230,40 +238,44 @@ def escape_html(text):
     return text
 
 
-def md_link_to_html(text):
+def md_link_to_html(text, s=None):
     """将 Markdown 链接转为 HTML 链接（微信兼容：不加 border）"""
+    accent = s["accent"] if s else PAPER_ACCENT
     def replace_link(m):
         link_text = m.group(1)
         link_url = m.group(2)
-        return f'<a href="{link_url}" style="color: {PAPER_ACCENT}; text-decoration: none">{link_text}</a>'
+        return f'<a href="{link_url}" style="color: {accent}; text-decoration: none">{link_text}</a>'
     return re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_link, text)
 
 
-def md_bold_to_html(text):
+def md_bold_to_html(text, s=None):
     """将 Markdown 粗体转为 HTML（微信兼容：用 <b> 而非 <strong>，不额外设 font-weight）"""
+    heading = s["heading"] if s else PAPER_HEADING
     def replace_bold(m):
-        return f'<b style="color: {PAPER_HEADING}">{m.group(1)}</b>'
+        return f'<b style="color: {heading}">{m.group(1)}</b>'
     return re.sub(r'\*\*([^*]+)\*\*', replace_bold, text)
 
 
-def md_code_to_html(text):
+def md_code_to_html(text, s=None):
     """将 Markdown 行内代码转为 HTML（微信兼容：不加 border）"""
+    table_bg = s.get("table_bg", PAPER_TABLE_BG) if s else PAPER_TABLE_BG
+    accent = s["accent"] if s else PAPER_ACCENT
     def replace_code(m):
         code = m.group(1)
-        return f'<code style="font-size: 12px; background: {PAPER_TABLE_BG}; color: {PAPER_ACCENT}; padding: 2px 6px">{code}</code>'
+        return f'<code style="font-size: 12px; background: {table_bg}; color: {accent}; padding: 2px 6px">{code}</code>'
     return re.sub(r'`([^`]+)`', replace_code, text)
 
 
-def format_text(text):
+def format_text(text, s=None):
     """格式化 Markdown 文本为 HTML"""
     text = escape_html(text)
-    text = md_link_to_html(text)
-    text = md_bold_to_html(text)
-    text = md_code_to_html(text)
+    text = md_link_to_html(text, s)
+    text = md_bold_to_html(text, s)
+    text = md_code_to_html(text, s)
     return text
 
 
-def render_table(table_data):
+def render_table(table_data, s):
     """渲染 Markdown 表格为微信兼容 HTML（报纸风格）"""
     if not table_data:
         return ""
@@ -279,17 +291,17 @@ def render_table(table_data):
     else:
         col_widths = [f"{100//col_count}%"] * col_count
 
-    html = f'<table style="width: 100%; border-collapse: collapse; margin: 0; font-size: 13px; border: 1px solid {PAPER_RULE}">\n'
+    html = f'<table style="width:100%;border-collapse:collapse;margin:0;font-size:13px;border:1px solid {s["rule"]}">\n'
 
     html += '  <colgroup>\n'
     for w in col_widths:
-        html += f'    <col style="width: {w}" />\n'
+        html += f'    <col style="width:{w}" />\n'
     html += '  </colgroup>\n'
 
     html += '  <thead>\n'
-    html += f'    <tr style="background: {PAPER_TABLE_BG}">\n'
+    html += f'    <tr style="background:{s["table_bg"]}">\n'
     for h in headers:
-        html += f'      <th style="padding: 8px 10px; border: 1px solid {PAPER_RULE}; text-align: left; font-weight: bold; color: {PAPER_HEADING}; font-size: 12px; background: {PAPER_TABLE_BG}">{format_text(h)}</th>\n'
+        html += f'      <th style="padding:8px 10px;border:1px solid {s["rule"]};text-align:left;font-weight:bold;color:{s["heading"]};font-size:12px;background:{s["table_bg"]}">{format_text(h, s)}</th>\n'
     html += '    </tr>\n'
     html += '  </thead>\n'
 
@@ -297,11 +309,11 @@ def render_table(table_data):
     for i, row in enumerate(rows):
         html += '    <tr>\n'
         for j, cell in enumerate(row):
-            cell_html = format_text(cell)
+            cell_html = format_text(cell, s)
             if '⭐' in cell:
-                cell_html = re.sub(r'(\d{1,3}(?:,\d{3})*)', r'<span style="color: #b8860b; font-weight: bold">\1</span>', cell_html)
-            border_bottom = f'; border-bottom: 1px solid #ede5d0' if i < len(rows) - 1 else ''
-            html += f'      <td style="padding: 8px 10px; border: 1px solid {PAPER_RULE}; border-top: none; color: {PAPER_DARK}{border_bottom}">{cell_html}</td>\n'
+                cell_html = re.sub(r'(\d{1,3}(?:,\d{3})*)', r'<span style="color:#b8860b;font-weight:bold">\1</span>', cell_html)
+            border_bottom = f';border-bottom:1px solid #ede5d0' if i < len(rows) - 1 else ''
+            html += f'      <td style="padding:8px 10px;border:1px solid {s["rule"]};border-top:none;color:{s["dark"]}{border_bottom}">{cell_html}</td>\n'
         html += '    </tr>\n'
     html += '  </tbody>\n'
     html += '</table>\n'
@@ -309,31 +321,36 @@ def render_table(table_data):
     return html
 
 
-def render_item(item, color):
-    """渲染单条新闻为微信兼容 HTML 卡片（报纸专栏风格，微信安全）"""
-    html = f'<section style="background: {PAPER_CARD}; padding: 16px; margin: 0 0 12px 0; border-left: 3px solid {color}; border-bottom: 1px solid #ede5d0">\n'
+def render_item(item, color, s):
+    """渲染单条新闻为微信兼容 HTML 卡片（报纸专栏风格，微信安全）
 
-    # 标题：h3 不加额外 font-family，用系统默认
-    html += f'  <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: {PAPER_HEADING}; line-height: 1.5; text-indent: 0">{format_text(item["title"])}</h3>\n'
+    body 已设 text-indent:0 可继承，卡片内各元素不再重复该属性。
+    公共样式（font-size;color;line-height）提升到卡片 section，p 只剩 margin。
+    """
+    card_fs = s.get("card_font_size", s["text_font_size"])
+    html = f'<section style="background:{s["card"]};padding:16px;margin:0 0 12px 0;border-left:3px solid {color};border-bottom:1px solid #ede5d0;font-size:{card_fs};color:{s["dark"]};line-height:1.9">\n'
 
-    # 描述：正文
+    # 标题：h3 覆盖 font-size/color/line-height，其余继承
+    html += f'  <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:bold;color:{s["heading"]};line-height:1.5">{format_text(item["title"], s)}</h3>\n'
+
+    # 描述：正文 — font-size/color/line-height 已从 section 继承，只剩 margin
     if item["description"]:
-        html += f'  <p style="margin: 0 0 8px 0; font-size: 15px; color: {PAPER_DARK}; line-height: 1.9; text-indent: 0">{format_text(item["description"])}</p>\n'
+        html += f'  <p style="margin:0 0 8px 0">{format_text(item["description"], s)}</p>\n'
 
     # 表格
     if item["table"]:
-        html += '  ' + render_table(item["table"]).replace('\n', '\n  ').rstrip() + '\n'
+        html += '  ' + render_table(item["table"], s).replace('\n', '\n  ').rstrip() + '\n'
 
-    # 来源
+    # 来源 — 小字注脚，需要覆盖 font-size/color
     if item["source"]:
-        source_html = format_text(item["source"])
-        html += f'  <p style="margin: 8px 0 0 0; font-size: 11px; color: {PAPER_CAPTION}; text-indent: 0; letter-spacing: 0.5px">来源：{source_html}</p>\n'
+        source_html = format_text(item["source"], s)
+        html += f'  <p style="margin:8px 0 0 0;font-size:11px;color:{s["caption"]};letter-spacing:0.5px">来源：{source_html}</p>\n'
 
     html += '</section>\n'
     return html
 
 
-def render_summary_table(item):
+def render_summary_table(item, s):
     """渲染要点总结表格（报纸风格，微信安全）"""
     if not item or not item.get("table"):
         return ""
@@ -342,11 +359,11 @@ def render_summary_table(item):
     headers = table_data["headers"]
     rows = table_data["rows"]
 
-    html = f'<section style="background: {PAPER_CARD}; padding: 16px; border: 1px solid {PAPER_RULE}">\n'
-    html += '  <table style="width: 100%; border-collapse: collapse; margin: 0; font-size: 14px">\n'
+    html = f'<section style="background:{s["card"]};padding:16px;border:1px solid {s["rule"]}">\n'
+    html += '  <table style="width:100%;border-collapse:collapse;margin:0;font-size:14px">\n'
     html += '    <colgroup>\n'
-    html += '      <col style="width: 18%" />\n'
-    html += '      <col style="width: 82%" />\n'
+    html += '      <col style="width:18%" />\n'
+    html += '      <col style="width:82%" />\n'
     html += '    </colgroup>\n'
     html += '    <tbody>\n'
 
@@ -358,13 +375,13 @@ def render_summary_table(item):
     }
 
     for i, row in enumerate(rows):
-        border = f' style="border-bottom: 1px solid {PAPER_RULE}"' if i < len(rows) - 1 else ''
+        border = f' style="border-bottom:1px solid {s["rule"]}"' if i < len(rows) - 1 else ''
         cat = row[0].strip('*').strip() if row else ""
-        color = cat_colors.get(cat, PAPER_HEADING)
-        content = format_text(row[1]) if len(row) > 1 else ""
+        color = cat_colors.get(cat, s["heading"])
+        content = format_text(row[1], s) if len(row) > 1 else ""
         html += f'      <tr{border}>\n'
-        html += f'        <td style="padding: 10px 0; font-weight: bold; color: {color}; font-size: 14px; background: {PAPER_CARD}; vertical-align: top; letter-spacing: 1px">{format_text(cat)}</td>\n'
-        html += f'        <td style="padding: 10px 0; color: {PAPER_DARK}; line-height: 1.8; font-size: 14px; background: {PAPER_CARD}">{content}</td>\n'
+        html += f'        <td style="padding:10px 0;font-weight:bold;color:{color};font-size:14px;background:{s["card"]};vertical-align:top;letter-spacing:1px">{format_text(cat, s)}</td>\n'
+        html += f'        <td style="padding:10px 0;color:{s["dark"]};line-height:1.8;font-size:14px;background:{s["card"]}">{content}</td>\n'
         html += '      </tr>\n'
 
     html += '    </tbody>\n'
@@ -373,42 +390,171 @@ def render_summary_table(item):
     return html
 
 
-def generate_wechat_html(data):
+def generate_wechat_html(data, s=None):
     """生成微信兼容 HTML（报纸风格，微信安全）"""
+    if s is None:
+        s = load_style_config()["daily"]
+
     sections_html = []
 
     for section in data["sections"]:
         section_name = section["name"]
-        color = SECTION_COLORS.get(section_name, PAPER_ACCENT)
+        color = SECTION_COLORS.get(section_name, s["accent"])
 
-        # 分类标题：报纸栏目头，双线下划线改为实线
-        section_html = f'<section style="margin: 0 0 12px 0">\n'
-        section_html += f'  <h2 style="margin: 0; font-size: 18px; font-weight: bold; color: {PAPER_HEADING}; line-height: 1; padding: 0 0 8px 0; border-bottom: 2px solid {PAPER_HEADING}; letter-spacing: 2px">{section_name}</h2>\n'
-        section_html += f'  <hr style="border: none; border-top: 1px solid {PAPER_RULE}; margin: 0" />\n'
+        # 分类标题：报纸栏目头
+        section_html = f'<section style="margin:0 0 12px 0">\n'
+        section_html += f'  <h2 style="margin:0;font-size:{s["h2_font_size"]};font-weight:bold;color:{s["heading"]};line-height:1;padding:0 0 8px 0;border-bottom:2px solid {s["heading"]};letter-spacing:2px">{section_name}</h2>\n'
+        section_html += f'  <hr style="border:none;border-top:1px solid {s["rule"]};margin:0" />\n'
         section_html += '</section>\n'
 
         # 总结或普通卡片
         if "总结" in section_name:
             if section["items"]:
-                section_html += render_summary_table(section["items"][0])
+                section_html += render_summary_table(section["items"][0], s)
         else:
             for item in section["items"]:
-                section_html += render_item(item, color)
+                section_html += render_item(item, color, s)
 
-        # 板块间分隔线（最后一个板块不加），dashed 改为 solid
+        # 板块间分隔线（最后一个板块不加）
         if section != data["sections"][-1]:
-            section_html += f'<hr style="border: none; border-top: 1px solid {PAPER_RULE}; margin: 20px 0" />\n'
+            section_html += f'<hr style="border:none;border-top:1px solid {s["rule"]};margin:20px 0" />\n'
 
         sections_html.append(section_html)
 
     content = '\n'.join(sections_html)
 
-    return HTML_TEMPLATE.format(
+    template = _build_daily_template(s)
+    return template.format(
         title=escape_html(data["title"]),
-        meta=format_text(data["meta"]),
+        meta=format_text(data["meta"], s),
         content=content,
         footer=escape_html(data["footer"])
     )
+
+
+# ─── 样式配置加载 ─────────────────────────────────────
+
+def load_style_config(config_path=None):
+    """从 config.yaml 读取 style 配置，与内置默认值合并
+
+    config_path: 可选，指定配置文件路径（默认使用 CONFIG_PATH）
+
+    返回三级字典: {"daily": {...}, "ai": {...}, "essay": {...}}
+    每个模式包含颜色、字号、标签文字等配置项。
+    config.yaml 中未写的字段自动回退到代码默认值，无需全部列出。
+    """
+    if config_path is None:
+        config_path = CONFIG_PATH
+    defaults = {
+        "daily": {
+            "bg": PAPER_BG,
+            "card": PAPER_CARD,
+            "dark": PAPER_DARK,
+            "heading": PAPER_HEADING,
+            "accent": PAPER_ACCENT,
+            "rule": PAPER_RULE,
+            "muted": PAPER_MUTED,
+            "caption": PAPER_CAPTION,
+            "hero_bg": PAPER_HERO_BG,
+            "table_bg": PAPER_TABLE_BG,
+            "title_font_size": "22px",
+            "text_font_size": "15px",
+            "h2_font_size": "18px",
+            "card_font_size": "15px",
+        },
+        "ai": {
+            "bg": AI_BG,
+            "text": AI_TEXT,
+            "accent": AI_ACCENT,
+            "tag_bg": AI_TAG_BG,
+            "tag_txt": AI_TAG_TXT,
+            "bold": AI_BOLD,
+            "title_font_size": "22px",
+            "text_font_size": "16px",
+            "h2_font_size": "18px",
+            "cover_label": "AI 实践观察",
+        },
+        "essay": {
+            "bg": PAPER_BG,
+            "card": PAPER_CARD,
+            "dark": PAPER_DARK,
+            "heading": PAPER_HEADING,
+            "accent": AI_ACCENT,
+            "bold": AI_BOLD,
+            "rule": PAPER_RULE,
+            "caption": PAPER_CAPTION,
+            "hero_bg": PAPER_HERO_BG,
+            "title_font_size": "24px",
+            "text_font_size": "16px",
+            "h2_font_size": "18px",
+            "cover_label": "成语典故 · 历史人物",
+            "footer": "木昆子聊历史 · 成语典故系列",
+        },
+    }
+
+    # 读取 config.yaml 中的 style 节点（纯字符串解析，不依赖 pyyaml）
+    if not os.path.exists(config_path):
+        return defaults
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return defaults
+
+    # 定位 style: 节点
+    style_match = re.search(r'^style\s*:', content, re.MULTILINE)
+    if not style_match:
+        return defaults
+
+    # 解析 style 下的 key: value 对
+    style_block = content[style_match.start():]
+    mode = None
+    for line in style_block.splitlines():
+        raw_line = line
+        stripped = raw_line.strip()
+
+        # 遇到非 style 子节点的一级 key（不缩进），停止解析
+        if stripped and not stripped.startswith('#') and ':' in stripped and not raw_line.startswith(' ') and not raw_line.startswith('\t'):
+            key = stripped.split(':')[0].strip()
+            if key == 'style':
+                continue
+            else:
+                break  # 遇到 wechat 等其他一级节点，退出
+
+        if not stripped or stripped.startswith('#'):
+            continue
+
+        # 检测模式名（如 "    ai:" 或 "  daily:"）
+        mode_match = re.match(r'^(daily|ai|essay)\s*:\s*$', stripped)
+        if mode_match:
+            mode = mode_match.group(1)
+            continue
+
+        # 解析 key: value（支持引号包裹的值，正确处理 # 颜色码）
+        kv_match = re.match(r'^(\w+)\s*:\s*(.+)$', stripped)
+        if kv_match and mode and mode in defaults:
+            k, raw_v = kv_match.group(1), kv_match.group(2)
+            # 处理值：支持引号包裹，正确处理 # 颜色码
+            raw_v = raw_v.strip()
+            if raw_v and raw_v[0] in ('"', "'"):
+                # 引号包裹：提取引号内容
+                end_q = raw_v.find(raw_v[0], 1)
+                if end_q > 0:
+                    v = raw_v[1:end_q]
+                else:
+                    v = raw_v[1:].rstrip('"\'')
+            else:
+                # 无引号：去掉行尾注释
+                comment_pos = raw_v.find(' #')
+                if comment_pos >= 0:
+                    v = raw_v[:comment_pos].strip()
+                else:
+                    v = raw_v
+            if k in defaults[mode]:
+                defaults[mode][k] = v
+
+    return defaults
 
 
 # ─── 前置处理 ─────────────────────────────────────────────
@@ -442,16 +588,16 @@ AI_HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 </head>
-<body style="margin:0;padding:20px 16px;background:{ai_bg};font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif">
+<body style="margin:0;padding:20px 16px;background:{ai_bg};font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-indent:0;color:{ai_text}">
 
 <!-- 封面 -->
 <section style="background:{ai_tag_bg};padding:24px 20px;margin:0 0 24px 0">
-  <p style="margin:0 0 8px 0;font-size:11px;color:{ai_tag_txt};letter-spacing:2px;text-align:center;text-indent:0;opacity:0.8">AI 实践观察</p>
-  <h1 style="margin:0;font-size:22px;font-weight:bold;color:{ai_tag_txt};line-height:1.5;text-align:center;text-indent:0">{title}</h1>
+  <p style="margin:0 0 8px 0;font-size:11px;color:{ai_tag_txt};letter-spacing:2px;text-align:center;opacity:0.8">{cover_label}</p>
+  <h1 style="margin:0;font-size:{title_font_size};font-weight:bold;color:{ai_tag_txt};line-height:1.5;text-align:center">{title}</h1>
 </section>
 
 <!-- 正文区域：统一继承基础样式 -->
-<section style="color:{ai_text};font-size:16px;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px">
+<section style="font-size:{text_font_size};line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px">
 {content}
 </section>
 
@@ -521,7 +667,7 @@ def parse_essay(md_text):
             continue
 
         if in_code_block:
-            code_lines.append(stripped)
+            code_lines.append(raw)
             continue
 
         # H1 标题
@@ -608,139 +754,150 @@ def parse_essay(md_text):
 # ─── 长文 HTML 渲染 ─────────────────────────────────────
 
 # 封面模板（历史风格，深棕背景）
-ESSAY_HTML_TEMPLATE = """<!DOCTYPE html>
+_ESSAY_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 </head>
-<body style="margin:0;padding:20px 16px;background:__PAPER_BG__;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif">
+<body style="margin:0;padding:20px 16px;background:__BG__;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-indent:0">
 
 <!-- 封面 -->
-<section style="background:__PAPER_HERO_BG__;padding:28px 20px 22px;margin:0 0 0 0;border-top:4px solid __PAPER_RULE__">
-  <p style="margin:0 0 8px 0;font-size:11px;color:__PAPER_RULE__;letter-spacing:3px;text-align:center;text-indent:0">成语典故 · 历史人物</p>
-  <h1 style="margin:0 0 10px 0;font-size:24px;font-weight:bold;color:#faf7f0;line-height:1.4;text-align:center;border:none">{title}</h1>
+<section style="background:__HERO_BG__;padding:28px 20px 22px;margin:0 0 0 0;border-top:4px solid __RULE__">
+  <p style="margin:0 0 8px 0;font-size:11px;color:__RULE__;letter-spacing:3px;text-align:center">{cover_label}</p>
+  <h1 style="margin:0 0 10px 0;font-size:__TITLE_FONT_SIZE__;font-weight:bold;color:#faf7f0;line-height:1.4;text-align:center;border:none">{title}</h1>
 
 </section>
 
 <!-- 正文区域：统一继承字色/字号/行高，减少每段重复样式 -->
-<section style="background:__PAPER_BG__;color:__PAPER_DARK__;font-size:16px;line-height:1.9;padding:20px 4px 8px 4px">
+<section style="background:__BG__;color:__DARK__;font-size:__TEXT_FONT_SIZE__;line-height:1.9;padding:20px 4px 8px 4px">
 {content}
 </section>
 
 <!-- 页脚 -->
-<section style="border-top:2px solid __PAPER_RULE__;margin:16px 0 0 0;padding:10px 0 0 0;text-align:center">
-  <p style="margin:0;font-size:11px;color:__PAPER_CAPTION__;text-indent:0;letter-spacing:1px">{footer}</p>
+<section style="border-top:2px solid __RULE__;margin:16px 0 0 0;padding:10px 0 0 0;text-align:center">
+  <p style="margin:0;font-size:11px;color:__CAPTION__;letter-spacing:1px">{footer}</p>
 </section>
 
 </body>
 </html>"""
 
-for _name, _val in [
-    ("PAPER_BG", PAPER_BG), ("PAPER_CARD", PAPER_CARD),
-    ("PAPER_DARK", PAPER_DARK), ("PAPER_HEADING", PAPER_HEADING),
-    ("PAPER_ACCENT", PAPER_ACCENT), ("PAPER_RULE", PAPER_RULE),
-    ("PAPER_MUTED", PAPER_MUTED), ("PAPER_CAPTION", PAPER_CAPTION),
-    ("PAPER_HERO_BG", PAPER_HERO_BG), ("PAPER_TABLE_BG", PAPER_TABLE_BG),
-]:
-    ESSAY_HTML_TEMPLATE = ESSAY_HTML_TEMPLATE.replace(f"__{_name}__", _val)
+
+def _build_essay_template(s):
+    """用样式配置 s 替换长文模板占位符"""
+    t = _ESSAY_TEMPLATE
+    for name, val in [
+        ("BG", s["bg"]), ("DARK", s["dark"]),
+        ("HEADING", s["heading"]), ("ACCENT", s["accent"]),
+        ("RULE", s["rule"]), ("CAPTION", s["caption"]),
+        ("HERO_BG", s["hero_bg"]),
+        ("TITLE_FONT_SIZE", s["title_font_size"]),
+        ("TEXT_FONT_SIZE", s["text_font_size"]),
+    ]:
+        t = t.replace(f"__{name}__", val)
+    return t
 
 
-def generate_essay_html(data, footer="木昆子聊历史 · 成语典故系列"):
+def generate_essay_html(data, s=None, footer=None):
     """将 parse_essay 返回的结构渲染为微信兼容 HTML（极简内联样式）"""
+    if s is None:
+        s = load_style_config()["essay"]
+    if footer is None:
+        footer = s.get("footer", "木昆子聊历史 · 成语典故系列")
+
     content_parts = []
     for block in data["blocks"]:
         btype = block["type"]
-        text = block["text"]
+        text = block.get("text", "")
 
         if btype == "heading" and block["level"] == 2:
-            # H2：章节标题，棕色居中标签样式
+            # H2：章节标题，棕色居中标签样式（text-indent:0 从 body 继承）
             content_parts.append(
-                f'<h2 style="margin:24px auto 16px;padding:6px 20px;font-size:18px;font-weight:bold;color:#fff;'
-                f'background:{AI_ACCENT};text-align:center;border-radius:8px;'
-                f'box-shadow:0 2px 6px rgba(0,0,0,0.1);display:block;width:fit-content;line-height:1.6;text-indent:0">'
-                f'{format_text(escape_html(text))}</h2>'
+                f'<h2 style="margin:24px auto 16px;padding:6px 20px;font-size:{s["h2_font_size"]};font-weight:bold;color:#fff;'
+                f'background:{s["accent"]};text-align:center;border-radius:8px;'
+                f'box-shadow:0 2px 6px rgba(0,0,0,0.1);display:block;width:fit-content;line-height:1.6">'
+                f'{format_text(escape_html(text), s)}</h2>'
             )
         elif btype == "heading" and block["level"] == 3:
-            # H3：子标题，黑灰加粗
+            # H3：子标题，黑灰加粗（text-indent:0 从 body 继承）
             content_parts.append(
-                f'<p style="margin:20px 0 10px 0;font-size:16px;font-weight:bold;color:#333;text-indent:0">'
-                f'{format_text(escape_html(text))}</p>'
+                f'<p style="margin:20px 0 10px 0;font-size:16px;font-weight:bold;color:#333">'
+                f'{format_text(escape_html(text), s)}</p>'
             )
+        elif btype == "blockquote":
+            content_parts.append(render_ai_blockquote(text, s))
+        elif btype == "code_block":
+            content_parts.append(render_ai_code_block(text))
+        elif btype == "table":
+            content_parts.append(render_ai_table(block["rows"], s))
         elif btype == "para":
-            # 普通段落：去掉缩进
-            formatted = format_text(escape_html(text))
+            # 普通段落：text-indent:0 从 body 继承，只保留 margin
+            formatted = format_text(escape_html(text), s)
             content_parts.append(
-                f'<p style="margin:0 0 14px 0;text-indent:0">{formatted}</p>'
+                f'<p style="margin:0 0 14px 0">{formatted}</p>'
             )
 
     content = '\n'.join(content_parts)
-    return ESSAY_HTML_TEMPLATE.format(
+
+    template = _build_essay_template(s)
+    return template.format(
         title=escape_html(data["title"]),
         content=content,
-        footer=escape_html(footer)
+        footer=escape_html(footer),
+        cover_label=s.get("cover_label", "成语典故 · 历史人物")
     )
 
 
 # ─── AI 文章 HTML 生成（白底灰字 + 棕色标签）────────────────
 
-def ai_format_text(text):
+def ai_format_text(text, s=None):
     """AI 文章文本格式化"""
+    if s is None:
+        s = load_style_config()["ai"]
     text = escape_html(text)
     # 链接：棕色
     def replace_link(m):
-        return f'<a href="{m.group(2)}" style="color:{AI_ACCENT};text-decoration:none">{m.group(1)}</a>'
+        return f'<a href="{m.group(2)}" style="color:{s["accent"]};text-decoration:none">{m.group(1)}</a>'
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_link, text)
     # 粗体：加粗黑灰
     def replace_bold(m):
-        return f'<b style="font-weight:bold;color:{AI_BOLD}">{m.group(1)}</b>'
+        return f'<b style="font-weight:bold;color:{s["bold"]}">{m.group(1)}</b>'
     text = re.sub(r'\*\*([^*]+)\*\*', replace_bold, text)
     # 代码：浅灰背景
     def replace_code(m):
-        return f'<code style="font-size:13px;background:#f5f5f5;color:{AI_ACCENT};padding:2px 6px">{m.group(1)}</code>'
+        return f'<code style="font-size:13px;background:#f5f5f5;color:{s["accent"]};padding:2px 6px">{m.group(1)}</code>'
     text = re.sub(r'`([^`]+)`', replace_code, text)
     return text
 
 
-def render_ai_table(rows):
-    """渲染表格为微信兼容 HTML（AI文章风格）
-
-    微信公众号表格支持：
-    - table/thead/tbody 支持
-    - 简单边框 border: 1px solid
-    - padding 正常
-    - 不支持 border-radius
-    """
+def render_ai_table(rows, s):
+    """渲染表格为微信兼容 HTML（AI文章风格）"""
     if not rows:
         return ""
 
     # 解析表头和内容行
     headers = [c.strip() for c in rows[0].split('|')[1:-1]]
     data_rows = []
-    for row in rows[1:]:  # rows[0] 是表头，分隔行在 parse_essay 中已跳过
+    for row in rows[1:]:
         cells = [c.strip() for c in row.split('|')[1:-1]]
         if cells:
             data_rows.append(cells)
 
-    # 共享样式：padding 提到 tbody（微信支持），th/td 只保留差异化属性
-    # border: 1px solid #ddd 是表格边框必需，保留在 th/td 上（跨浏览器兼容）
     base = 'padding:10px 12px;border:1px solid #ddd'
     html = '<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">\n'
 
-    # 表头：背景 + 字号 + 字重差异，padding/border 继承 base
     html += '  <thead>\n'
     html += '    <tr>\n'
     for h in headers:
-        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{AI_BOLD};font-size:13px">{ai_format_text(h)}</th>\n'
+        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{s["bold"]};font-size:13px">{ai_format_text(h, s)}</th>\n'
     html += '    </tr>\n'
     html += '  </thead>\n'
 
-    # 表体：背景 + 文字色差异，padding 继承自 tbody style
     html += '  <tbody style="padding:10px 12px">\n'
     for i, row in enumerate(data_rows):
         bg = '#fff' if i % 2 == 0 else '#fafafa'
         html += '    <tr>\n'
         for cell in row:
-            html += f'      <td style="{base};background:{bg};color:{AI_TEXT}">{ai_format_text(cell)}</td>\n'
+            html += f'      <td style="{base};background:{bg}">{ai_format_text(cell, s)}</td>\n'
         html += '    </tr>\n'
     html += '  </tbody>\n'
     html += '</table>\n'
@@ -748,16 +905,12 @@ def render_ai_table(rows):
     return html
 
 
-def render_ai_blockquote(text):
-    """渲染引用块为微信兼容 HTML（AI文章风格）
-
-    样式：浅灰背景 + 棕色左边框 + 斜体灰字，段落间换行显示。
-    微信不支持 ::before 伪元素，边框直接用 border 实现。
-    """
-    formatted = ai_format_text(escape_html(text.replace('\n', '<br>')))
+def render_ai_blockquote(text, s):
+    """渲染引用块为微信兼容 HTML（AI文章风格）"""
+    formatted = ai_format_text(escape_html(text.replace('\n', '<br>')), s)
     html = (
         f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8'
-        f';border-left:4px solid {AI_ACCENT}">'
+        f';border-left:4px solid {s["accent"]}">'
         f'<p style="margin:0;font-size:14px;font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
         f'</section>'
     )
@@ -765,23 +918,14 @@ def render_ai_blockquote(text):
 
 
 def render_ai_code_block(code):
-    """渲染代码块为微信兼容 HTML（AI文章风格）
-
-    微信公众号代码块处理方式：
-    - 使用浅灰背景 + 深灰边框
-    - 等宽字体
-    - 横向滚动支持
-    - 不支持 border-radius，使用圆角替代为直角
-    """
+    """渲染代码块为微信兼容 HTML（AI文章风格，不依赖样式配置）"""
     if not code:
         return ""
 
-    # 转义HTML并保留换行
     escaped = escape_html(code)
     lines = escaped.split('\n')
     html_lines = []
     for line in lines:
-        # 处理行内代码（反转换，因为已经转义）
         line = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', line)
         html_lines.append(line)
 
@@ -793,20 +937,10 @@ def render_ai_code_block(code):
     return html
 
 
-def render_ai_ending():
-    """生成 AI 类文章尾部通用尾栏（微信兼容，极简内联样式）
-
-    结构：
-      —End—
-      如果觉得不错 随手点个 赞、在看、转发 三连吧
-      关注+星标 可第一时间收到更多精彩思考和总结
-      您的支持是我继续写下去的动力
-      注：原创不易，合作请在公众号后台留言，未经许可，不得随意修改及盗用原文。
-
-    样式策略：共有属性（字号、颜色、字间距、行高）提到父 section，
-    各 p 标签只保留 margin，节省字符。
-    """
-    # 共有样式：字号、颜色、字间距、行高
+def render_ai_ending(s=None):
+    """生成 AI 类文章尾部通用尾栏（微信兼容，极简内联样式）"""
+    if s is None:
+        s = load_style_config()["ai"]
     base_style = 'font-size:12px;color:#888;letter-spacing:0.5px;line-height:1.9'
     return (
         f'<section style="text-align:center;padding:24px 0 0 0;border-top:1px solid #eee;margin:20px 0 0 0;{base_style}">'
@@ -819,8 +953,10 @@ def render_ai_ending():
     )
 
 
-def generate_ai_html(data):
+def generate_ai_html(data, s=None):
     """生成 AI 类公众号文章 HTML（白底灰字 + 棕色标签标题）"""
+    if s is None:
+        s = load_style_config()["ai"]
 
     content_parts = []
     for block in data["blocks"]:
@@ -830,31 +966,27 @@ def generate_ai_html(data):
             text = block["text"]
             level = block["level"]
             if level == 2:
-                # H2：棕色居中标签标题
+                # H2：棕色居中标签标题（text-indent:0 从 body 继承，无需重复）
                 content_parts.append(
-                    f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;'
-                    f'background:{AI_ACCENT};text-align:center;display:block;'
-                    f'width:fit-content;line-height:1.6;text-indent:0;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
-                    f'{ai_format_text(escape_html(text))}</h2>'
+                    f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:{s["h2_font_size"]};font-weight:bold;color:#fff;'
+                    f'background:{s["accent"]};text-align:center;display:block;'
+                    f'width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
+                    f'{ai_format_text(escape_html(text), s)}</h2>'
                 )
             else:
                 # H3：灰黑加粗标题
                 content_parts.append(
-                    f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:#333;text-indent:0;line-height:1.5">'
-                    f'{ai_format_text(escape_html(text))}</p>'
+                    f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:#333;line-height:1.5">'
+                    f'{ai_format_text(escape_html(text), s)}</p>'
                 )
         elif btype == "table":
-            # 表格
-            content_parts.append(render_ai_table(block["rows"]))
+            content_parts.append(render_ai_table(block["rows"], s))
         elif btype == "blockquote":
-            # 引用块
-            content_parts.append(render_ai_blockquote(block["text"]))
+            content_parts.append(render_ai_blockquote(block["text"], s))
         elif btype == "code_block":
-            # 代码块
             content_parts.append(render_ai_code_block(block["text"]))
         elif btype == "para":
-            # 普通段落：默认无缩进，无需显式写 text-indent:0
-            formatted = ai_format_text(escape_html(block["text"]))
+            formatted = ai_format_text(escape_html(block["text"]), s)
             content_parts.append(
                 f'<p style="margin:0 0 14px 0">{formatted}</p>'
             )
@@ -862,18 +994,21 @@ def generate_ai_html(data):
     content = '\n'.join(content_parts)
 
     # 尾栏
-    ending = render_ai_ending()
+    ending = render_ai_ending(s)
 
     # 替换模板占位符
     html = AI_HTML_TEMPLATE.format(
-        ai_bg=AI_BG,
-        ai_text=AI_TEXT,
-        ai_tag_bg=AI_TAG_BG,
-        ai_tag_txt=AI_TAG_TXT,
+        ai_bg=s["bg"],
+        ai_text=s["text"],
+        ai_tag_bg=s["tag_bg"],
+        ai_tag_txt=s["tag_txt"],
         title=escape_html(data["title"]),
-        content=content
+        content=content,
+        cover_label=s.get("cover_label", "AI 实践观察"),
+        title_font_size=s["title_font_size"],
+        text_font_size=s["text_font_size"],
     )
-    # 尾栏追加到正文末尾（在最后一个 </section> 之后）
+    # 尾栏追加到正文末尾
     html = html.replace('</section>\n\n</body>', f'</section>\n{ending}\n\n</body>')
     return html
 
@@ -883,13 +1018,22 @@ def generate_ai_html(data):
 def main():
     args = sys.argv[1:]
     mode = "daily"  # daily | essay | ai
+    config_path = None
 
-    if args and args[0] == '--essay':
-        mode = "essay"
-        args = args[1:]
-    elif args and args[0] == '--ai':
-        mode = "ai"
-        args = args[1:]
+    i = 0
+    while i < len(args):
+        if args[i] == '--essay':
+            mode = "essay"
+        elif args[i] == '--ai':
+            mode = "ai"
+        elif args[i] == '--config':
+            i += 1
+            if i < len(args):
+                config_path = args[i]
+        else:
+            break
+        i += 1
+    args = args[i:]
 
     if not args:
         print("用法:")
@@ -917,21 +1061,24 @@ def main():
     # 去掉 frontmatter
     md_text = strip_frontmatter(md_text)
 
+    # 加载样式配置
+    style_cfg = load_style_config(config_path=config_path)
+
     if mode == "essay":
         data = parse_essay(md_text)
-        html = generate_essay_html(data)
+        html = generate_essay_html(data, s=style_cfg["essay"])
         print(f"生成成功（长文模式）: {output_file}")
         print(f"   标题: {data['title']}")
         print(f"   段落块数: {len(data['blocks'])}")
     elif mode == "ai":
         data = parse_essay(md_text)
-        html = generate_ai_html(data)
+        html = generate_ai_html(data, s=style_cfg["ai"])
         print(f"生成成功（AI文章模式）: {output_file}")
         print(f"   标题: {data['title']}")
         print(f"   段落块数: {len(data['blocks'])}")
     else:
         data = parse_markdown(md_text)
-        html = generate_wechat_html(data)
+        html = generate_wechat_html(data, s=style_cfg["daily"])
         print(f"生成成功: {output_file}")
         print(f"   标题: {data['title']}")
         print(f"   板块数: {len(data['sections'])}")

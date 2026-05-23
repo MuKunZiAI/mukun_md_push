@@ -110,9 +110,25 @@ rm -rf /tmp/mukun_md_push
 
 | 示例 | Markdown | HTML 预览 | 适用场景 |
 |------|----------|-----------|---------|
-| 日报模式 | [daily_example.md](examples/daily_example.md) | [daily_example.html](examples/daily_example.html) | AI 周报、行业动态汇总 |
-| 长文模式 | [essay_example.md](examples/essay_example.md) | [essay_example.html](examples/essay_example.html) | 成语典故、历史故事 |
-| AI文章模式 | [ai_article_example.md](examples/ai_article_example.md) | [ai_article_example.html](examples/ai_article_example.html) | 技术实践、AI 深度文章 |
+| 日报模式 | [daily_example.md](examples/default/daily_example.md) | [daily_example.html](examples/default/daily_example.html) | AI 周报、行业动态汇总 |
+| 长文模式 | [essay_example.md](examples/default/essay_example.md) | [essay_example.html](examples/default/essay_example.html) | 成语典故、历史故事 |
+| AI文章模式 | [ai_article_example.md](examples/default/ai_article_example.md) | [ai_article_example.html](examples/default/ai_article_example.html) | 技术实践、AI 深度文章 |
+
+#### 配色方案
+
+除默认配色外，`examples/` 下还提供了两套自定义配色方案及对应示例：
+
+| 配色方案 | 配置文件 | 示例预览 | 说明 |
+|----------|----------|----------|------|
+| 泛黄怀旧 | [config_nostalgic.yaml](examples/nostalgic/config_nostalgic.yaml) | [essay_nostalgic_example.html](examples/nostalgic/essay_nostalgic_example.html) | 深古卷泛黄 + 古铜暖棕，适合历史文章 |
+| 现代化 | [config_modern.yaml](examples/modern/config_modern.yaml) | [ai_modern_example.html](examples/modern/ai_modern_example.html) | 科技蓝紫 + 深邃灰蓝，适合 AI 科技文章 |
+
+使用自定义配色生成示例：
+
+```bash
+python3 scripts/md2wechat_html.py --config examples/nostalgic/config_nostalgic.yaml --essay story.md
+python3 scripts/md2wechat_html.py --config examples/modern/config_modern.yaml --ai article.md
+```
 
 ### 日报模式示例
 
@@ -220,6 +236,9 @@ python3 scripts/md2wechat_html.py --essay story.md
 
 # AI 文章模式
 python3 scripts/md2wechat_html.py --ai ai_article.md
+
+# 使用自定义配色配置
+python3 scripts/md2wechat_html.py --config /path/to/my_theme.yaml --ai ai_article.md
 ```
 
 ### 转换 + 推送草稿箱
@@ -259,15 +278,34 @@ mukun_md_push/
 │   ├── md2wechat_html.py       # Markdown → 微信 HTML 转换器
 │   └── push_daily.py           # 转换 + 推送草稿箱脚本
 ├── examples/
-│   ├── daily_example.md        # 日报模式示例 Markdown
-│   ├── daily_example.html      # 日报模式生成的 HTML
-│   ├── essay_example.md        # 长文模式示例 Markdown
-│   ├── essay_example.html      # 长文模式生成的 HTML
-│   ├── ai_article_example.md   # AI文章模式示例 Markdown
-│   └── ai_article_example.html # AI文章模式生成的 HTML
+│   ├── default/                 # 默认配色示例
+│   │   ├── daily_example.md
+│   │   ├── daily_example.html
+│   │   ├── essay_example.md
+│   │   ├── essay_example.html
+│   │   ├── ai_article_example.md
+│   │   └── ai_article_example.html
+│   ├── nostalgic/               # 泛黄怀旧配色方案（历史文章）
+│   │   ├── config_nostalgic.yaml
+│   │   └── essay_nostalgic_example.html
+│   └── modern/                  # 现代化配色方案（AI 科技文章）
+│       ├── config_modern.yaml
+│       └── ai_modern_example.html
 ├── LICENSE
 └── README.md
 ```
+
+## 修改说明
+
+### 2026-05-23
+
+- **CSS 内联优化**：将 `text-indent`、`font-size`、`color`、`line-height` 等可继承属性提升到父级 `<body>`/`<section>`，减少重复声明。日报模式节省 10.4%，AI 模式节省 4.5%，长文模式节省 6.2%
+- **超长文章自动拆分**：HTML 超过 20000 字符时按段落边界自动拆分为多篇，合并到同一个草稿推送，标题自动追加（上/中/下）后缀，智能截断保留后缀（`_truncate_title()`）
+- **样式配置外部化**：`md2wechat_html.py` 新增 `load_style_config()` 从 `~/.md_push_wechat/config.yaml` 读取 `style` 节点覆盖内置默认值，支持 daily/ai/essay 三种模式独立配色，纯字符串解析 YAML 不引入额外依赖
+- **`--config` 参数**：`md2wechat_html.py` 支持通过 `--config <path>` 指定任意配色配置文件
+- **修复代码块缩进丢失**：`parse_essay()` 收集代码块行时改用 `raw`（保留行首空格），修复 YAML、文件树等缩进代码渲染后缩进丢失的问题
+- **修复 YAML 值解析**：引号内的 `#` 颜色码不再被误判为注释，`load_style_config()` 正确读取自定义 `config_path` 参数
+- **示例按配色方案分目录**：`examples/` 下新增 `default/`、`nostalgic/`（泛黄怀旧）、`modern/`（科技蓝紫）三个子目录，各含配置文件和示例 HTML
 
 ## License
 
