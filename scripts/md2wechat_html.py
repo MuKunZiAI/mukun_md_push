@@ -43,7 +43,8 @@ PAPER_CAPTION = "#a89880"    # 来源/脚注：淡棕
 PAPER_HERO_BG = "#3c2415"    # 封面背景：深棕
 PAPER_TABLE_BG = "#f0ead8"   # 表头底色
 
-SECTION_COLORS = {
+# 内置默认分类颜色（可在 config.yaml 的 daily.section_colors 中覆盖）
+DEFAULT_SECTION_COLORS = {
     "行业动态":              "#b8860b",
     "AI 工具与智能体更新":    "#556b2f",
     "AI 工具":              "#556b2f",
@@ -54,6 +55,17 @@ SECTION_COLORS = {
     "今日要点总结":           "#3c2415",
     "本周要点总结":           "#3c2415",
 }
+
+# 内置默认要点总结表格的类别颜色（可在 config.yaml 的 daily.summary_colors 中覆盖）
+DEFAULT_SUMMARY_COLORS = {
+    "行业": "#b8860b",
+    "工具": "#556b2f",
+    "模型": "#4a3728",
+    "研究": "#2f4f4f",
+}
+
+# 内置默认触发总结表格渲染的板块名称关键词列表
+DEFAULT_SUMMARY_SECTIONS = ["总结"]
 
 # ─── HTML 模板（报纸风格，微信兼容） ────────────────────
 # 使用 __PLACEHOLDER__ 避免与后续 .format() 的 {title} 等冲突
@@ -67,7 +79,7 @@ _DAILY_TEMPLATE = """<!DOCTYPE html>
 
 <!-- 封面标题区：报纸报头风格 -->
 <section style="background:__HERO_BG__;padding:24px 20px 20px;margin:0 0 6px 0;border-top:4px solid __RULE__">
-  <p style="margin:0 0 10px 0;font-size:11px;color:__RULE__;letter-spacing:2px;text-align:center">AI WEEKLY REVIEW</p>
+  <p style="margin:0 0 10px 0;font-size:11px;color:__RULE__;letter-spacing:2px;text-align:center">__COVER_LABEL__</p>
   <h1 style="margin:0;font-size:__TITLE_FONT_SIZE__;font-weight:bold;color:#faf7f0;line-height:1.5;text-align:center;border:none">{title}</h1>
 </section>
 
@@ -97,6 +109,7 @@ def _build_daily_template(s):
         ("MUTED", s["muted"]), ("CAPTION", s["caption"]),
         ("HERO_BG", s["hero_bg"]), ("TABLE_BG", s["table_bg"]),
         ("TITLE_FONT_SIZE", s["title_font_size"]),
+        ("COVER_LABEL", s.get("cover_label", "AI WEEKLY REVIEW")),
     ]:
         t = t.replace(f"__{name}__", val)
     return t
@@ -367,12 +380,8 @@ def render_summary_table(item, s):
     html += '    </colgroup>\n'
     html += '    <tbody>\n'
 
-    cat_colors = {
-        "行业": "#b8860b",
-        "工具": "#556b2f",
-        "模型": "#4a3728",
-        "研究": "#2f4f4f",
-    }
+    # 使用来自样式配置的总结颜色（可在 config.yaml 中自定义）
+    cat_colors = s.get("summary_colors", DEFAULT_SUMMARY_COLORS)
 
     for i, row in enumerate(rows):
         border = f' style="border-bottom:1px solid {s["rule"]}"' if i < len(rows) - 1 else ''
@@ -399,7 +408,9 @@ def generate_wechat_html(data, s=None):
 
     for section in data["sections"]:
         section_name = section["name"]
-        color = SECTION_COLORS.get(section_name, s["accent"])
+        # 从样式配置读取分类颜色（可在 config.yaml 中自定义）
+        section_colors = s.get("section_colors", DEFAULT_SECTION_COLORS)
+        color = section_colors.get(section_name, s["accent"])
 
         # 分类标题：报纸栏目头
         section_html = f'<section style="margin:0 0 12px 0">\n'
@@ -407,8 +418,12 @@ def generate_wechat_html(data, s=None):
         section_html += f'  <hr style="border:none;border-top:1px solid {s["rule"]};margin:0" />\n'
         section_html += '</section>\n'
 
+        # 判断是否为总结板块（从样式配置读取，可在 config.yaml 中自定义）
+        summary_sections = s.get("summary_sections", DEFAULT_SUMMARY_SECTIONS)
+        is_summary = any(kw in section_name for kw in summary_sections)
+
         # 总结或普通卡片
-        if "总结" in section_name:
+        if is_summary:
             if section["items"]:
                 section_html += render_summary_table(section["items"][0], s)
         else:
@@ -461,6 +476,11 @@ def load_style_config(config_path=None):
             "text_font_size": "15px",
             "h2_font_size": "18px",
             "card_font_size": "15px",
+            "cover_label": "AI WEEKLY REVIEW",          # 封面副标题
+            # 分类配置（可在 config.yaml 中覆盖）
+            "section_colors": dict(DEFAULT_SECTION_COLORS),   # 板块名 -> 颜色
+            "summary_colors": dict(DEFAULT_SUMMARY_COLORS),   # 总结表格类别标签 -> 颜色
+            "summary_sections": list(DEFAULT_SUMMARY_SECTIONS),  # 触发总结渲染的关键词
         },
         "ai": {
             "bg": AI_BG,
@@ -473,6 +493,14 @@ def load_style_config(config_path=None):
             "text_font_size": "16px",
             "h2_font_size": "18px",
             "cover_label": "AI 实践观察",
+            # 文章尾栏文字（可在 config.yaml 中覆盖，每行为一个列表项）
+            "ending_lines": [
+                "—End—",
+                "如果觉得不错 随手点个 <span style=\"color:#ff4c41\">赞</span>、<span style=\"color:#ff2941\">在看</span>、<span style=\"color:#ff4c41\">转发</span> 三连吧",
+                "<span style=\"color:#ff2941\">关注+星标</span> 可第一时间收到更多精彩思考和总结",
+                "您的支持是我继续写下去的动力",
+                "注：原创不易，合作请在公众号后台留言，未经许可，不得随意修改及盗用原文。",
+            ],
         },
         "essay": {
             "bg": PAPER_BG,
@@ -508,8 +536,34 @@ def load_style_config(config_path=None):
         return defaults
 
     # 解析 style 下的 key: value 对
+    # 支持结构：
+    #   style:
+    #     daily:
+    #       accent: "#xxx"
+    #       section_colors:          # map 子结构
+    #         行业动态: "#b8860b"
+    #       summary_sections:        # 列表子结构
+    #         - 总结
+    #         - 汇总
     style_block = content[style_match.start():]
-    mode = None
+    mode = None         # 当前模式：daily/ai/essay
+    sub_map = None      # 当前正在填充的子 map key（如 section_colors）
+    sub_is_list = False # 当前子结构是否是列表
+    list_initialized = set()  # 记录已被用户覆盖初始化的 "mode.key" 列表
+
+    def _parse_value(raw_v):
+        """解析 YAML 值，支持引号、颜色码、去掉行尾注释"""
+        raw_v = raw_v.strip()
+        if raw_v and raw_v[0] in ('"', "'"):
+            end_q = raw_v.find(raw_v[0], 1)
+            if end_q > 0:
+                return raw_v[1:end_q]
+            return raw_v[1:].rstrip('"\'')
+        comment_pos = raw_v.find(' #')
+        if comment_pos >= 0:
+            return raw_v[:comment_pos].strip()
+        return raw_v
+
     for line in style_block.splitlines():
         raw_line = line
         stripped = raw_line.strip()
@@ -525,34 +579,68 @@ def load_style_config(config_path=None):
         if not stripped or stripped.startswith('#'):
             continue
 
-        # 检测模式名（如 "    ai:" 或 "  daily:"）
+        # 检测模式名（如 "  daily:" 或 "    daily:"）
         mode_match = re.match(r'^(daily|ai|essay)\s*:\s*$', stripped)
         if mode_match:
             mode = mode_match.group(1)
+            sub_map = None
+            sub_is_list = False
             continue
 
-        # 解析 key: value（支持引号包裹的值，正确处理 # 颜色码）
-        kv_match = re.match(r'^(\w+)\s*:\s*(.+)$', stripped)
-        if kv_match and mode and mode in defaults:
-            k, raw_v = kv_match.group(1), kv_match.group(2)
-            # 处理值：支持引号包裹，正确处理 # 颜色码
-            raw_v = raw_v.strip()
-            if raw_v and raw_v[0] in ('"', "'"):
-                # 引号包裹：提取引号内容
-                end_q = raw_v.find(raw_v[0], 1)
-                if end_q > 0:
-                    v = raw_v[1:end_q]
-                else:
-                    v = raw_v[1:].rstrip('"\'')
+        if not mode or mode not in defaults:
+            continue
+
+        # 检测列表项（"- value"）
+        if stripped.startswith('- ') and sub_map and sub_is_list:
+            list_key = f"{mode}.{sub_map}"
+            if list_key not in list_initialized:
+                defaults[mode][sub_map] = []  # 首次写入时清空默认值
+                list_initialized.add(list_key)
+            v = _parse_value(stripped[2:])
+            if v:
+                defaults[mode][sub_map].append(v)
+            continue
+
+        # 检测子 map/list key 行（无值，如 "section_colors:"）
+        sub_key_match = re.match(r'^(\w+)\s*:\s*$', stripped)
+        if sub_key_match:
+            k = sub_key_match.group(1)
+            if k in defaults[mode] and isinstance(defaults[mode][k], dict):
+                sub_map = k
+                sub_is_list = False
+                defaults[mode][k] = {}  # 清空默认，用户完整覆盖
+            elif k in defaults[mode] and isinstance(defaults[mode][k], list):
+                sub_map = k
+                sub_is_list = True
+                # 列表在首个 "- " 行时才清空（此处仅标记进入状态）
             else:
-                # 无引号：去掉行尾注释
-                comment_pos = raw_v.find(' #')
-                if comment_pos >= 0:
-                    v = raw_v[:comment_pos].strip()
-                else:
-                    v = raw_v
+                sub_map = None
+                sub_is_list = False
+            continue
+
+        # 检测普通 ASCII key: value
+        kv_match = re.match(r'^(\w+)\s*:\s*(.+)$', stripped)
+        if kv_match:
+            k, raw_v = kv_match.group(1), kv_match.group(2)
+            v = _parse_value(raw_v)
+            # 在子 map 内（如 section_colors 的条目）
+            if sub_map and not sub_is_list and sub_map in defaults[mode]:
+                defaults[mode][sub_map][k] = v
+                continue
+            # 退出子结构
+            sub_map = None
+            sub_is_list = False
             if k in defaults[mode]:
                 defaults[mode][k] = v
+            continue
+
+        # 含中文的 key: value（如板块名 "行业动态: #xxx"）
+        cn_kv = re.match(r'^(.+?)\s*:\s*(.+)$', stripped)
+        if cn_kv and sub_map and not sub_is_list:
+            k = cn_kv.group(1).strip()
+            v = _parse_value(cn_kv.group(2))
+            if sub_map in defaults[mode] and isinstance(defaults[mode][sub_map], dict):
+                defaults[mode][sub_map][k] = v
 
     return defaults
 
@@ -938,18 +1026,29 @@ def render_ai_code_block(code):
 
 
 def render_ai_ending(s=None):
-    """生成 AI 类文章尾部通用尾栏（微信兼容，极简内联样式）"""
+    """生成 AI 类文章尾部通用尾栏（微信兼容，极简内联样式）
+
+    尾栏文字从样式配置 s 的 ending_lines 列表读取，可在 config.yaml 中覆盖。
+    每个列表项渲染为一个 <p> 段落（支持内嵌 HTML 标签，如 <span style="...">）。
+    """
     if s is None:
         s = load_style_config()["ai"]
     base_style = 'font-size:12px;color:#888;letter-spacing:0.5px;line-height:1.9'
+    ending_lines = s.get("ending_lines", [
+        "—End—",
+        "如果觉得不错 随手点个 <span style=\"color:#ff4c41\">赞</span>、<span style=\"color:#ff2941\">在看</span>、<span style=\"color:#ff4c41\">转发</span> 三连吧",
+        "<span style=\"color:#ff2941\">关注+星标</span> 可第一时间收到更多精彩思考和总结",
+        "您的支持是我继续写下去的动力",
+        "注：原创不易，合作请在公众号后台留言，未经许可，不得随意修改及盗用原文。",
+    ])
+    lines_html = ''.join(
+        f'<p style="margin:0 0 10px 0">{line}</p>'
+        for line in ending_lines
+    )
     return (
         f'<section style="text-align:center;padding:24px 0 0 0;border-top:1px solid #eee;margin:20px 0 0 0;{base_style}">'
-        '<p style="margin:0 0 10px 0">—End—</p>'
-        '<p style="margin:0 0 10px 0">如果觉得不错 随手点个 <span style="color:#ff4c41">赞</span>、<span style="color:#ff2941">在看</span>、<span style="color:#ff4c41">转发</span> 三连吧</p>'
-        '<p style="margin:0 0 10px 0"><span style="color:#ff2941">关注+星标</span> 可第一时间收到更多精彩思考和总结</p>'
-        '<p style="margin:0 0 10px 0">您的支持是我继续写下去的动力</p>'
-        '<p style="margin:0">注：原创不易，合作请在公众号后台留言，未经许可，不得随意修改及盗用原文。</p>'
-        '</section>'
+        f'{lines_html}'
+        f'</section>'
     )
 
 

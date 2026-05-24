@@ -52,8 +52,8 @@ python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --ai ai_article.md ai_w
 调用脚本：
 ```bash
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER] [--media-id MEDIA_ID]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER] [--media-id MEDIA_ID]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
 ```
 
 支持 Markdown frontmatter 提取标题和摘要：
@@ -64,9 +64,23 @@ digest: 手动摘要（80字以内）
 ---
 ```
 
-完整工作流：Markdown → HTML（复用技能1） → 上传封面图 → 推送草稿箱。
+### 完整工作流
 
-**自动拆分**：当 HTML 内容超过 20000 字符限制时，脚本会自动按 H2 标题拆分为多篇合并推送（同一图文消息内，读者上滑查看），标题自动添加（上）（中）（下）后缀。
+**必须严格按以下步骤执行：**
+
+1. **读取 Markdown 文件内容**（用 Read 工具）
+2. **提取 frontmatter**：检查文件顶部是否有 `---` 包裹的 YAML 区段，提取 `title` 和 `digest` 字段
+3. **生成摘要（重要！）**：如果 frontmatter 中没有 `digest` 字段，则**必须**根据文章正文内容自动生成一条 120 个字符以内的中文摘要，通过 `--digest` 参数传入脚本。摘要要求：
+   - 简洁精炼，概括文章核心内容
+   - 严格控制在 120 个字符以内（含标点）
+   - 不要使用 markdown 格式或 HTML 标签
+   - 不要以「本文」「这篇文章」开头
+4. **调用 `push_daily.py`**：将生成的摘要通过 `--digest` 参数传入（若 frontmatter 已有 digest 则使用 frontmatter 中的值）
+5. 脚本自动执行：Markdown → HTML → 上传封面图 → 推送草稿箱
+
+> **注意**：摘要生成是必选步骤，不可跳过。不要让脚本自动截取 120 字符——那会产生不完整的无意义截断。
+
+**自动拆分**：当 HTML 内容超过 20000 字符限制时，脚本会自动按 H2 标题拆分为多篇合并推送（同一图文消息内，读者上滑查看），标题自动添加（上）（中）（下）后缀。拆分后非首篇的摘要由脚本自动生成，无需手动处理。
 
 ## CSS 内联优化策略（字符节省）
 

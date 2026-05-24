@@ -297,6 +297,18 @@ mukun_md_push/
 
 ## 修改说明
 
+### 2026-05-24
+
+- **日报分类颜色可配置**：`SECTION_COLORS` 从硬编码改为从 `config.yaml` 的 `daily.section_colors` 读取。用 `板块名: 颜色值` 的 map 格式配置，配置后完整覆盖默认值，未匹配的板块名用 `accent` 兜底。使得「科技前沿」、「金融动态」等任意自定义板块名都能有独立配色
+- **总结表格类别颜色可配置**：`render_summary_table()` 中 "行业/工具/模型/研究" 四个硬编码类别标签颜色改为从 `daily.summary_colors` 读取，支持完全自定义
+- **总结板块判断可配置**：之前固定判断板块名包含「总结」才渲染为总结表格，改为从 `daily.summary_sections` 读取关键词列表（默认 `["总结"]`）。包含列表中任意关键词即触发总结渲染，支持「汇总」、「本期总结」等不同写法
+- **YAML 解析器扩展**：`load_style_config()` 新增支持三级嵌套 map（`section_colors`/`summary_colors`）和列表（`summary_sections`），支持含中文的 key（板块名）
+- **底部结尾文字全部可配置**：
+  - daily 模式：封面副标题（默认 `"AI WEEKLY REVIEW"`）改为 `daily.cover_label` 可配置
+  - ai 模式：尾栏固定文字（—End—、三连、关注+星标、支持感谢、版权声明）改为 `ai.ending_lines` 列表可配置，每项渲染为一个段落，支持内嵌 HTML 标签
+  - essay 模式：`footer`（底部署名）与 `cover_label`（封面副标题）已可通过 `essay.footer` / `essay.cover_label` 配置（均含默认值）
+- **推送摘要改为 AI 自动生成**：之前推送草稿箱时，若未手动指定 `--digest` 则直接截取正文前 120 字符，产生不完整无意义的截断。改为在 SKILL.md 中指示 AI agent 先读取文章内容、自动生成 120 字以内的精炼摘要再通过 `--digest` 传入。frontmatter 中已有 `digest` 时仍优先使用手动值
+
 ### 2026-05-23
 
 - **CSS 内联优化**：将 `text-indent`、`font-size`、`color`、`line-height` 等可继承属性提升到父级 `<body>`/`<section>`，减少重复声明。日报模式节省 10.4%，AI 模式节省 4.5%，长文模式节省 6.2%

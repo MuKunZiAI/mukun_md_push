@@ -455,13 +455,7 @@ def _push_multi_drafts(access_token, parts, thumb_media_id, cover_path="", diges
 
     articles = []
     for i, (part_title, part_html) in enumerate(parts):
-        part_digest = ""
-        if i == 0 and digest:
-            part_digest = digest
-        else:
-            plain = re.sub(r"<[^>]+>", "", part_html)
-            plain = re.sub(r"\s+", " ", plain).strip()
-            part_digest = plain[:120] if len(plain) > 120 else plain
+        part_digest = digest or ""
 
         part_title = _truncate_title(part_title)
 
