@@ -1,20 +1,39 @@
-# mukun_md_push_wechat
+<p align="center">
+  <strong>mukun_md_push_wechat</strong><br/><br/>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.6+-green.svg" alt="Python 3.6+" /></a>
+  <img src="https://img.shields.io/badge/WeChat-公众号推送-07C160?logo=wechat&logoColor=white" alt="WeChat" />
+</p>
+<br/>
 
-将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可一键推送到公众号草稿箱。
+> 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可一键推送到公众号草稿箱。
 
-## 功能特性
+## ✨ 功能特性
 
-- **三种转换模式**：日报模式（默认）、长文/历史故事模式（`--essay`）、AI 文章模式（`--ai`）
-- **微信样式兼容**：所有 CSS 内联，使用 `<section>` 替代 `<div>`，规避微信渲染限制
-- **草稿箱推送**：转换后直接上传到微信公众号草稿箱，手动补图即可发布
-- **Frontmatter 支持**：可在 Markdown 文件顶部声明标题和摘要
-- **多平台兼容**：同时支持 WorkBuddy、Claude Code、OpenCode、Codex CLI
+- 📰 **三种转换模式**：日报模式（默认）、长文/历史故事模式（`--essay`）、AI 文章模式（`--ai`）
+- 🎨 **微信样式兼容**：所有 CSS 内联，使用 `<section>` 替代 `<div>`，规避微信渲染限制
+- 📤 **草稿箱推送**：转换后直接上传到微信公众号草稿箱，手动补图即可发布
+- 📝 **Frontmatter 支持**：可在 Markdown 文件顶部声明标题和摘要
+- 🔧 **多平台兼容**：同时支持 WorkBuddy、Claude Code、OpenCode、Codex CLI
 
-## 安装
+## 📦 安装
 
 本 Skill 遵循通用的 `SKILL.md + scripts/` 结构，可安装到多个主流 AI 编程工具中。
 
 > **注意**：各工具的 skill 目录名（`mukun-md-push-wechat`）即仓库中的 `SKILL.md` 文件夹名。
+
+### 通用方式（适用于任何 AI 智能体）
+
+无需安装，直接在对话中把以下内容发给任意 AI 智能体：
+
+```
+请读取并执行这个 Skill：
+https://raw.githubusercontent.com/MuKunZiAI/mukun_md_push/main/SKILL.md
+
+然后帮我把 <你的文件路径>.md 转换为微信公众号 HTML。
+```
+
+AI 会自动获取 SKILL.md 中的指令并按步骤执行，无需提前配置任何环境。适用于 WorkBuddy、Claude Code、OpenCode、Cursor、Gemini CLI 等所有支持联网读取的智能体。
 
 ### WorkBuddy
 
@@ -104,7 +123,7 @@ rm -rf /tmp/mukun_md_push
 
 > Codex 的 Skills 是独立 `.md` 文件格式（Description / Input / Steps），而本 Skill 使用 `SKILL.md` + `scripts/` 结构。上述安装方式让 Codex 读取到 SKILL.md 中的指令内容，同时脚本可用于手动调用。
 
-## 使用示例
+## 💡 使用示例
 
 仓库 `examples/` 目录下提供了三种模式的完整示例 Markdown 文件及其生成的 HTML 预览：
 
@@ -223,7 +242,7 @@ def collect_git_commits(repo_path: str, since: str):
 > 如果你的团队使用 Conventional Commits 规范，收集后的信息质量会高很多。
 ```
 
-## 使用方式
+## 🚀 使用方式
 
 ### 仅转换 HTML
 
@@ -265,7 +284,7 @@ python3 scripts/push_daily.py --ai ai_article.md
 python3 scripts/push_daily.py article.md --title "自定义标题" --cover ./封面图.png --digest "自定义摘要"
 ```
 
-## 目录结构
+## 📁 目录结构
 
 ```
 mukun_md_push/
@@ -295,7 +314,7 @@ mukun_md_push/
 └── README.md
 ```
 
-## 修改说明
+## 📋 修改说明
 
 ### 2026-05-24
 
@@ -319,6 +338,6 @@ mukun_md_push/
 - **修复 YAML 值解析**：引号内的 `#` 颜色码不再被误判为注释，`load_style_config()` 正确读取自定义 `config_path` 参数
 - **示例按配色方案分目录**：`examples/` 下新增 `default/`、`nostalgic/`（泛黄怀旧）、`modern/`（科技蓝紫）三个子目录，各含配置文件和示例 HTML
 
-## License
+## 📄 License
 
 MIT
