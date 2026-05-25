@@ -208,98 +208,37 @@ python3 scripts/md2wechat_html.py --config examples/modern/config_modern.yaml --
 
 </details>
 
-### 新闻模式示例
+### 新闻模式
 
-一条消息对应一条新闻，分固定四大板块，报纸风格配色：
+板块化日报，报纸风格配色：
 
-```markdown
-# AI 周报 · 第12期
+<p align="center">
+  <img src="assets/news.png" alt="新闻模式" width="480" />
+</p>
 
-> 来源：木昆子AI实验室 | 2026-05-22
+### 文章模式（默认风格）
 
----
+白底灰字 + 棕色标签二级标题，适合技术实践、AI 深度文章：
 
-## 行业动态
+<p align="center">
+  <img src="assets/article_default.png" alt="文章模式-默认" width="480" />
+</p>
 
-### OpenAI 发布 GPT-5 Turbo
-全新的 GPT-5 Turbo 在推理速度和准确率上均大幅提升...
+### 文章模式（泛黄怀旧）
 
-来源：OpenAI Blog
+古卷泛黄底色 + 古铜暖棕强调色，适合历史文化类叙事长文：
 
----
+<p align="center">
+  <img src="assets/article_nostalgic.png" alt="文章模式-泛黄怀旧" width="480" />
+</p>
 
-## AI 工具与智能体更新
-## 模型发布与更新
-## 重要研究进展
+### 文章模式（科技蓝紫）
 
----
+深邃灰蓝背景 + 蓝紫渐变强调色，适合 AI 科技、技术前沿文章：
 
-## 本周要点总结
-
-| 类别 | 要点 |
-|------|------|
-| 行业 | 大模型价格战持续 |
-| 工具 | Cursor 4.0 和 Coze 2.0 发布 |
-```
-
-### 文章模式示例（泛黄怀旧风格）
-
-泛黄报纸风格背景，适合叙事类长文：
-
-```markdown
-# 卧薪尝胆
-
-> 春秋时期 · 越王勾践的复国之路
-
----
-
-## 背景
-勾践在夫椒之战中大败于吴王夫差...
-
-## 受辱三年
-在吴国期间，勾践表现得极为恭顺...
-
-## 归国图强
-回到越国后，勾践**卧薪尝胆**...
-
-## 复仇灭吴
-公元前473年，勾践率军大举伐吴...
-
-## 成语释义
-> **卧薪尝胆**：薪，柴草；胆，苦胆。形容人刻苦自励，发愤图强。
-```
-
-### 文章模式示例（默认风格）
-
-白底灰字 + 棕色标签二级标题，支持代码块、引用块、表格：
-
-```markdown
----
-title: 用 AI Agent 自动化你的周报工作流
-digest: 从需求分析到落地部署，一步步构建自动化周报 Agent
----
-
-# 用 AI Agent 自动化你的周报工作流
-
-## 为什么要自动化周报
-每周五下午写周报大概是程序员最头疼的事之一...
-
-## 技术选型
-
-| 环节 | 方案 | 理由 |
-|------|------|------|
-| 编排框架 | LangGraph | 支持复杂的状态机 |
-
-## 收集模块的实现
-
-```python
-def collect_git_commits(repo_path: str, since: str):
-    repo = git.Repo(repo_path)
-    ...
-```
-
-> 如果你的团队使用 Conventional Commits 规范，收集后的信息质量会高很多。
-```
+<p align="center">
+  <img src="assets/article_modern.png" alt="文章模式-科技蓝紫" width="480" />
+</p>
 
 ## 🚀 使用方式
 
