@@ -1,0 +1,611 @@
+#!/usr/bin/env python3
+"""
+Markdown -> 微信兼容 HTML 转换器（文章模式）
+
+用法:
+  python3 md2article_html.py <input.md> [output.html]
+  python3 md2article_html.py --config /path/to/config.yaml <input.md> [output.html]
+
+文章模式：统一的长文叙事渲染，适配微信公众号文章样式。
+默认配色为白底灰字 + 棕色标签（AI文章风格），可通过 config.yaml 的 style.article 节点
+切换为泛黄报纸风格或自定义配色。
+"""
+
+import re
+import sys
+import os
+
+# ─── 配置路径 ──────────────────────────────────────────
+CONFIG_PATH = os.path.join(os.path.expanduser("~/.md_push_wechat"), "config.yaml")
+
+
+# ─── 文章模式 HTML 模板 ────────────────────────────────
+# 所有需要动态填充的位置使用 __PLACEHOLDER__ 格式，
+# 由 _build_article_template() 一次性完成全部替换。
+
+_ARTICLE_RAW_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body style="margin:0;padding:20px 16px;background:__BG__;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-indent:0">
+
+<!-- 封面 -->
+<section style="background:__HERO_BG__;padding:28px 20px 22px;margin:0 0 24px 0;border-top:4px solid __RULE__">
+  <p style="margin:0 0 8px 0;font-size:11px;color:__RULE__;letter-spacing:3px;text-align:center;opacity:0.8">__COVER_LABEL__</p>
+  <h1 style="margin:0 0 10px 0;font-size:__TITLE_FONT_SIZE__;font-weight:bold;color:__HERO_TITLE_COLOR__;line-height:1.4;text-align:center;border:none">__TITLE__</h1>
+</section>
+
+<!-- 正文区域 -->
+<section style="font-size:__TEXT_FONT_SIZE__;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px;color:__TEXT_COLOR__">
+__CONTENT__
+</section>
+
+__FOOTER_SECTION__
+
+__ENDING_SECTION__
+
+</body>
+</html>"""
+
+
+def _build_article_html(s, title, content, footer_section="", ending_section=""):
+    """用样式配置和内容数据一次性构建文章 HTML"""
+    t = _ARTICLE_RAW_TEMPLATE
+    hero_title_color = s.get("hero_title_color", "#faf7f0")
+    text_color = s.get("text", s.get("dark", "rgb(85,85,85)"))
+    rule = s.get("rule", "#c4a882")
+
+    for name, val in [
+        ("BG", s["bg"]),
+        ("HERO_BG", s.get("hero_bg", s["accent"])),
+        ("RULE", rule),
+        ("COVER_LABEL", s.get("cover_label", "AI 实践观察")),
+        ("TITLE_FONT_SIZE", s["title_font_size"]),
+        ("HERO_TITLE_COLOR", hero_title_color),
+        ("TEXT_FONT_SIZE", s["text_font_size"]),
+        ("TEXT_COLOR", text_color),
+        ("TITLE", title),
+        ("CONTENT", content),
+        ("FOOTER_SECTION", footer_section),
+        ("ENDING_SECTION", ending_section),
+    ]:
+        t = t.replace(f"__{name}__", val)
+    return t
+
+
+# ─── Markdown 解析 ─────────────────────────────────────
+
+def parse_article(md_text):
+    """
+    解析文章 Markdown，支持：
+    - # H1 标题
+    - > ... 引用块
+    - ## H2 章节标题
+    - ### H3 子标题
+    - --- 分隔线
+    - 普通段落
+    - **粗体**
+    - 表格
+    - 代码块
+    返回 {"title": str, "blocks": [...]}
+    """
+    lines = md_text.strip().split('\n')
+    title = ""
+    blocks = []
+    para_buf = []
+    in_code_block = False
+    code_lines = []
+    table_lines = []
+    in_table = False
+    bq_buf = []
+    in_blockquote = False
+
+    def flush_para():
+        if para_buf:
+            text = ' '.join(para_buf).strip()
+            if text:
+                blocks.append({"type": "para", "text": text})
+            para_buf.clear()
+
+    def flush_table():
+        if table_lines:
+            blocks.append({"type": "table", "rows": table_lines.copy()})
+            table_lines.clear()
+
+    def flush_bq():
+        if bq_buf:
+            text = '\n'.join(bq_buf).strip()
+            if text:
+                blocks.append({"type": "blockquote", "text": text})
+            bq_buf.clear()
+
+    for line in lines:
+        raw = line.rstrip()
+        stripped = raw.strip()
+
+        # 代码块
+        if stripped.startswith('```'):
+            if in_code_block:
+                blocks.append({"type": "code_block", "text": '\n'.join(code_lines)})
+                code_lines.clear()
+            else:
+                flush_para()
+                flush_table()
+            in_code_block = not in_code_block
+            continue
+
+        if in_code_block:
+            code_lines.append(raw)
+            continue
+
+        # H1 标题
+        if stripped.startswith('# ') and not stripped.startswith('## '):
+            flush_para()
+            flush_table()
+            if not title:
+                title = stripped[2:].strip()
+            continue
+
+        # 引用块
+        if stripped.startswith('> '):
+            flush_para()
+            flush_table()
+            if not in_blockquote:
+                flush_bq()
+                in_blockquote = True
+            bq_buf.append(stripped[2:].strip())
+            continue
+
+        if in_blockquote:
+            flush_bq()
+            in_blockquote = False
+
+        # H2 章节标题
+        if stripped.startswith('## '):
+            flush_para()
+            flush_table()
+            blocks.append({"type": "heading", "text": stripped[3:].strip(), "level": 2})
+            continue
+
+        # H3 子标题
+        if stripped.startswith('### '):
+            flush_para()
+            flush_table()
+            blocks.append({"type": "heading", "text": stripped[4:].strip(), "level": 3})
+            continue
+
+        # 分隔线
+        if stripped in ('---', '***', '* * *'):
+            flush_para()
+            flush_table()
+            continue
+
+        # 表格行
+        if stripped.startswith('|'):
+            def is_separator_row(cells):
+                for c in cells:
+                    s = c.strip()
+                    if s and not all(ch in '-: ' for ch in s):
+                        return False
+                return True
+            cells = stripped.split('|')[1:-1]
+            if is_separator_row(cells):
+                continue
+            flush_para()
+            if in_table:
+                table_lines.append(stripped)
+            else:
+                in_table = True
+                table_lines.append(stripped)
+            continue
+        elif in_table:
+            flush_table()
+            in_table = False
+
+        # 空行
+        if not stripped:
+            flush_para()
+            continue
+
+        # 普通段落
+        para_buf.append(stripped)
+
+    flush_para()
+    flush_bq()
+    if in_table:
+        flush_table()
+    return {"title": title, "blocks": blocks}
+
+
+# ─── HTML 生成 ─────────────────────────────────────────
+
+def escape_html(text):
+    text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+    return text
+
+
+def format_text(text, s):
+    """文章文本格式化：粗体、链接、行内代码"""
+    text = escape_html(text)
+
+    # 链接
+    accent = s["accent"]
+    def replace_link(m):
+        return f'<a href="{m.group(2)}" style="color:{accent};text-decoration:none">{m.group(1)}</a>'
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_link, text)
+
+    # 粗体
+    bold_color = s.get("bold", "#333")
+    def replace_bold(m):
+        return f'<b style="font-weight:bold;color:{bold_color}">{m.group(1)}</b>'
+    text = re.sub(r'\*\*([^*]+)\*\*', replace_bold, text)
+
+    # 行内代码
+    def replace_code(m):
+        return f'<code style="font-size:13px;background:#f5f5f5;color:{accent};padding:2px 6px">{m.group(1)}</code>'
+    text = re.sub(r'`([^`]+)`', replace_code, text)
+
+    return text
+
+
+def render_table(rows, s):
+    """渲染表格为微信兼容 HTML"""
+    if not rows:
+        return ""
+
+    headers = [c.strip() for c in rows[0].split('|')[1:-1]]
+    data_rows = []
+    for row in rows[1:]:
+        cells = [c.strip() for c in row.split('|')[1:-1]]
+        if cells:
+            data_rows.append(cells)
+
+    bold_color = s.get("bold", "#333")
+    base = 'padding:10px 12px;border:1px solid #ddd'
+    html = '<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">\n'
+
+    html += '  <thead>\n'
+    html += '    <tr>\n'
+    for h in headers:
+        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{bold_color};font-size:13px">{format_text(h, s)}</th>\n'
+    html += '    </tr>\n'
+    html += '  </thead>\n'
+
+    html += '  <tbody style="padding:10px 12px">\n'
+    for i, row in enumerate(data_rows):
+        bg = '#fff' if i % 2 == 0 else '#fafafa'
+        html += '    <tr>\n'
+        for cell in row:
+            html += f'      <td style="{base};background:{bg}">{format_text(cell, s)}</td>\n'
+        html += '    </tr>\n'
+    html += '  </tbody>\n'
+    html += '</table>\n'
+
+    return html
+
+
+def render_blockquote(text, s):
+    """渲染引用块"""
+    formatted = format_text(escape_html(text.replace('\n', '<br>')), s)
+    html = (
+        f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8'
+        f';border-left:4px solid {s["accent"]}">'
+        f'<p style="margin:0;font-size:14px;font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
+        f'</section>'
+    )
+    return html
+
+
+def render_code_block(code):
+    """渲染代码块"""
+    if not code:
+        return ""
+
+    escaped = escape_html(code)
+    lines = escaped.split('\n')
+    html_lines = []
+    for line in lines:
+        line = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', line)
+        html_lines.append(line)
+
+    code_html = '<br>'.join(html_lines)
+
+    html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto">
+  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre">{code_html}</code>
+</section>'''
+    return html
+
+
+def render_ending(s):
+    """生成文章尾栏（如 AI 文章的三连/版权声明等）"""
+    lines = s.get("ending_lines", None)
+    if not lines:
+        return ""
+
+    base_style = 'font-size:12px;color:#888;letter-spacing:0.5px;line-height:1.9'
+    lines_html = ''.join(
+        f'<p style="margin:0 0 10px 0">{line}</p>'
+        for line in lines
+    )
+    return (
+        f'<section style="text-align:center;padding:24px 0 0 0;border-top:1px solid #eee;margin:20px 0 0 0;{base_style}">'
+        f'{lines_html}'
+        f'</section>'
+    )
+
+
+def render_footer(s):
+    """生成页脚（如历史文章模式的底部署名）"""
+    footer_text = s.get("footer", "")
+    if not footer_text:
+        return ""
+
+    rule = s.get("rule", "#c4a882")
+    caption = s.get("caption", "#a89880")
+    return (
+        f'<section style="border-top:2px solid {rule};margin:16px 0 0 0;padding:10px 0 0 0;text-align:center">'
+        f'<p style="margin:0;font-size:11px;color:{caption};letter-spacing:1px">{escape_html(footer_text)}</p>'
+        f'</section>'
+    )
+
+
+def generate_html(data, s):
+    """生成微信兼容 HTML（文章模式）"""
+    content_parts = []
+
+    for block in data["blocks"]:
+        btype = block["type"]
+        text = block.get("text", "")
+
+        if btype == "heading" and block["level"] == 2:
+            content_parts.append(
+                f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:{s["h2_font_size"]};font-weight:bold;color:#fff;'
+                f'background:{s["accent"]};text-align:center;display:block;'
+                f'width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
+                f'{format_text(escape_html(text), s)}</h2>'
+            )
+        elif btype == "heading" and block["level"] == 3:
+            content_parts.append(
+                f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:#333;line-height:1.5">'
+                f'{format_text(escape_html(text), s)}</p>'
+            )
+        elif btype == "blockquote":
+            content_parts.append(render_blockquote(text, s))
+        elif btype == "code_block":
+            content_parts.append(render_code_block(text))
+        elif btype == "table":
+            content_parts.append(render_table(block["rows"], s))
+        elif btype == "para":
+            formatted = format_text(escape_html(text), s)
+            content_parts.append(
+                f'<p style="margin:0 0 14px 0">{formatted}</p>'
+            )
+
+    content = '\n'.join(content_parts)
+
+    footer_section = render_footer(s)
+    ending_section = render_ending(s)
+
+    return _build_article_html(s, escape_html(data["title"]), content, footer_section, ending_section)
+
+
+# ─── 样式配置加载 ─────────────────────────────────────
+
+# 默认配置（AI 文章风格）
+ARTICLE_DEFAULTS = {
+    "bg": "#ffffff",
+    "text": "rgb(85,85,85)",
+    "accent": "rgb(198,110,73)",
+    "hero_bg": "rgb(198,110,73)",
+    "hero_title_color": "#ffffff",
+    "bold": "rgb(51,51,51)",
+    "rule": "#ddd",
+    "caption": "#888",
+    "title_font_size": "22px",
+    "text_font_size": "16px",
+    "h2_font_size": "18px",
+    "cover_label": "AI 实践观察",
+    "footer": "",
+    "ending_lines": [
+        "—End—",
+        "如果觉得不错 随手点个 <span style=\"color:#ff4c41\">赞</span>、<span style=\"color:#ff2941\">在看</span>、<span style=\"color:#ff4c41\">转发</span> 三连吧",
+        "<span style=\"color:#ff2941\">关注+星标</span> 可第一时间收到更多精彩思考和总结",
+        "您的支持是我继续写下去的动力",
+        "注：原创不易，合作请在公众号后台留言，未经许可，不得随意修改及盗用原文。",
+    ],
+}
+
+
+def load_article_style_config(config_path=None):
+    """从 config.yaml 读取 style.article 配置，与内置默认值合并"""
+    if config_path is None:
+        config_path = CONFIG_PATH
+
+    defaults = dict(ARTICLE_DEFAULTS)
+
+    if not os.path.exists(config_path):
+        return defaults
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return defaults
+
+    style_match = re.search(r'^style\s*:', content, re.MULTILINE)
+    if not style_match:
+        return defaults
+
+    style_block = content[style_match.start():]
+    in_article = False
+    sub_is_list = False
+    sub_map = None
+    list_initialized = set()
+
+    def _parse_value(raw_v):
+        raw_v = raw_v.strip()
+        if raw_v and raw_v[0] in ('"', "'"):
+            end_q = raw_v.find(raw_v[0], 1)
+            if end_q > 0:
+                return raw_v[1:end_q]
+            return raw_v[1:].rstrip('"\'')
+        comment_pos = raw_v.find(' #')
+        if comment_pos >= 0:
+            return raw_v[:comment_pos].strip()
+        return raw_v
+
+    for line in style_block.splitlines():
+        raw_line = line
+        stripped = raw_line.strip()
+
+        # 遇到非 style 子节点的一级 key，停止解析
+        if stripped and not stripped.startswith('#') and ':' in stripped and not raw_line.startswith(' ') and not raw_line.startswith('\t'):
+            key = stripped.split(':')[0].strip()
+            if key == 'style':
+                continue
+            else:
+                break
+
+        if not stripped or stripped.startswith('#'):
+            continue
+
+        # 进入 article 模式节点
+        if re.match(r'^article\s*:\s*$', stripped):
+            in_article = True
+            sub_map = None
+            sub_is_list = False
+            continue
+
+        # 遇到其他模式节点，退出 article
+        if re.match(r'^(news|daily|ai|essay)\s*:\s*$', stripped):
+            in_article = False
+            sub_map = None
+            sub_is_list = False
+            continue
+
+        if not in_article:
+            continue
+
+        # 列表项（ending_lines）
+        if stripped.startswith('- ') and sub_map and sub_is_list:
+            list_key = f"article.{sub_map}"
+            if list_key not in list_initialized:
+                defaults[sub_map] = []
+                list_initialized.add(list_key)
+            v = _parse_value(stripped[2:])
+            if v:
+                defaults[sub_map].append(v)
+            continue
+
+        # 空列表声明（key: []）
+        empty_list_match = re.match(r'^(\w+)\s*:\s*\[\s*\]\s*$', stripped)
+        if empty_list_match:
+            k = empty_list_match.group(1)
+            if k in defaults and isinstance(defaults[k], list):
+                defaults[k] = []
+                # 标记为已初始化，防止后续列表项添加
+                list_initialized.add(f"article.{k}")
+            sub_map = None
+            sub_is_list = False
+            continue
+
+        # 子 key 无值行（列表声明）
+        sub_key_match = re.match(r'^(\w+)\s*:\s*$', stripped)
+        if sub_key_match:
+            k = sub_key_match.group(1)
+            if k in defaults and isinstance(defaults[k], list):
+                sub_map = k
+                sub_is_list = True
+            else:
+                sub_map = None
+                sub_is_list = False
+            continue
+
+        # 普通 key: value
+        kv_match = re.match(r'^(\w+)\s*:\s*(.+)$', stripped)
+        if kv_match:
+            k, raw_v = kv_match.group(1), kv_match.group(2)
+            v = _parse_value(raw_v)
+            sub_map = None
+            sub_is_list = False
+            if k in defaults:
+                defaults[k] = v
+            continue
+
+    return defaults
+
+
+# ─── 前置处理 ─────────────────────────────────────────
+
+def strip_frontmatter(md_text):
+    """去掉 Markdown 文件开头的 YAML frontmatter"""
+    if md_text.startswith("---"):
+        parts = md_text.split("---", 2)
+        if len(parts) >= 3:
+            body = parts[2].strip()
+            return body.lstrip("\n")
+    return md_text
+
+
+# ─── 主入口 ─────────────────────────────────────────────
+
+def main():
+    args = sys.argv[1:]
+    config_path = None
+
+    i = 0
+    while i < len(args):
+        if args[i] == '--config':
+            i += 1
+            if i < len(args):
+                config_path = args[i]
+        else:
+            break
+        i += 1
+    args = args[i:]
+
+    if not args:
+        print("用法:")
+        print("  python3 md2article_html.py <input.md> [output.html]")
+        print("  python3 md2article_html.py --config /path/to/config.yaml <input.md> [output.html]")
+        sys.exit(1)
+
+    md_file = args[0]
+    if len(args) >= 2:
+        output_file = args[1]
+    else:
+        base = os.path.splitext(md_file)[0]
+        output_file = f"{base}_article_wechat.html"
+
+    if not os.path.exists(md_file):
+        print(f"ERROR: 文件不存在: {md_file}")
+        sys.exit(1)
+
+    with open(md_file, "r", encoding="utf-8") as f:
+        md_text = f.read()
+
+    md_text = strip_frontmatter(md_text)
+    s = load_article_style_config(config_path=config_path)
+
+    data = parse_article(md_text)
+    html = generate_html(data, s)
+    print(f"生成成功（文章模式）: {output_file}")
+    print(f"   标题: {data['title']}")
+    print(f"   段落块数: {len(data['blocks'])}")
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    char_count = len(html)
+    print(f"   总字符: {char_count}")
+    if char_count > 20000:
+        print(f"   ⚠️  警告: 字符数 {char_count} 超过微信公众号草稿接口限制（20000字符）！")
+    else:
+        print(f"   ✅ 字符数在微信限制内（{char_count}/20000）")
+
+
+if __name__ == "__main__":
+    main()

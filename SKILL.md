@@ -1,6 +1,6 @@
 ---
 name: mukun-md-push-wechat
-description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持日报模式（默认）、长文/历史故事模式（--essay）、AI 文章模式（--ai）。当用户提到"md转微信html""推送公众号""转换微信公众号格式"等意图时触发此技能。
+description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持新闻模式（默认）和文章模式。当用户提到"md转微信html""推送公众号""转换微信公众号格式"等意图时触发此技能。
 allowed-tools: Read, Bash, Write
 ---
 
@@ -21,6 +21,12 @@ allowed-tools: Read, Bash, Write
 
 **决策原则**：技能 2（推送）已包含技能 1（转换），无需同时调用两者。
 
+**模式速查**：
+| 模式 | 标志 | 独立脚本 | 适用场景 |
+|------|------|---------|---------|
+| 新闻模式 | `--news`（默认） | `md2news_html.py` | AI 周报、行业动态汇总（板块化日报） |
+| 文章模式 | `--article` | `md2article_html.py` | 技术实践、成语典故、长文叙事（配色通过 config.yaml 控制）
+
 ## 技能 1：Markdown → 微信 HTML
 
 调用脚本：
@@ -28,32 +34,36 @@ allowed-tools: Read, Bash, Write
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py <input.md> [output.html]
 ```
 
-三种转换模式：
-- **日报模式（默认）**：一条消息对应一条新闻，分四大板块，报纸风格配色
-- **长文/历史故事模式（`--essay`）**：泛黄报纸风格背景，适合成语典故、历史故事类长文
-- **AI 文章模式（`--ai`）**：白底灰字 + 棕色标签二级标题 + 固定尾栏，适合 AI 实践类文章
+两种转换模式：
+- **新闻模式（默认）**：一条消息对应一条新闻，分板块展示，报纸风格配色
+- **文章模式（`--article`）**：长文叙事渲染，默认白底灰字 + 棕色标签标题，可通过 config.yaml 配置为泛黄报纸风格或任意自定义配色
 
 示例：
 ```bash
-# 日报模式
+# 新闻模式（默认）
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py article.md article_wechat.html
 
-# 长文模式
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --essay story.md story_wechat.html
+# 文章模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --article story.md story_wechat.html
 
-# AI文章模式
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --ai ai_article.md ai_wechat.html
+# 指定配置文件
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --config /path/to/config.yaml --article story.md
 ```
 
-输出 HTML 文件保存在当前工作目录。若未指定 output.html，则根据模式自动生成文件名后缀（`_wechat.html`、`_essay_wechat.html`、`_ai_wechat.html`）。
+也可直接调用独立脚本：
+```bash
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2news_html.py article.md
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2article_html.py --config /path/to/config.yaml story.md
+```
+
+输出 HTML 文件保存在当前工作目录。若未指定输出文件，则自动生成（`_news_wechat.html` 或 `_article_wechat.html`）。
 
 ## 技能 2：转换 + 推送草稿箱
 
 调用脚本：
 ```bash
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
 ```
 
 支持 Markdown frontmatter 提取标题和摘要：
@@ -94,9 +104,8 @@ digest: 手动摘要（80字以内）
 实测节省效果（示例文件）：
 | 模式 | 优化前 | 优化后 | 节省 |
 |------|--------|--------|------|
-| 日报 | 9,324 字符 | 8,352 字符 | 972 字符 (10.4%) |
-| AI文章 | 9,527 字符 | 9,101 字符 | 426 字符 (4.5%) |
-| 长文 | 3,366 字符 | 3,156 字符 | 210 字符 (6.2%) |
+| 新闻 | 9,324 字符 | 8,352 字符 | 972 字符 (10.4%) |
+| 文章 | 9,527 字符 | 9,101 字符 | 426 字符 (4.5%) |
 
 ## 前置检查
 

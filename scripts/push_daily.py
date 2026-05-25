@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-日报/长文推送脚本：Markdown → 微信兼容 HTML → 草稿箱
+新闻/文章推送脚本：Markdown → 微信兼容 HTML → 草稿箱
 
 用法:
-  # 日报模式（默认）
+  # 新闻模式（默认）
   python3 push_daily.py <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
 
-  # 长文/成语故事模式
-  python3 push_daily.py --essay <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
-
-  # AI类文章模式
-  python3 push_daily.py --ai <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
+  # 文章模式
+  python3 push_daily.py --article <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
 
 Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title 和 --digest 参数）：
   ---
@@ -21,18 +18,17 @@ Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title
 
 封面图处理:
 - media_id 获取优先级：命令行 --media-id > config.yaml wechat.media_id > 上传封面图
-- 日报模式：首次上传封面图，media_id 保存到 cover_media_id.txt，后续复用
-- 长文模式（--essay）：每个成语封面图都是专属的，每次都重新上传，不复用
-- AI文章模式（--ai）：每篇文章封面图不同，每次都重新上传，不复用
-- 默认封面图: 当前目录下的 "封面图.png"
-- --essay 模式默认使用 "成语历史典故封面.png"（如存在）
-- --ai 模式默认使用 "AI文章封面.png"（如存在）
-- 1:1 裁剪坐标固定为 "1008,0,1872,864"（成语典故系列）
+- 新闻模式：首次上传封面图，media_id 保存到 cover_media_id.txt，后续复用
+- 文章模式：每次都重新上传封面图（每篇文章封面不同），不复用
+- 默认封面图: ~/.md_push_wechat/封面图.png
+- 文章模式默认封面图: ~/.md_push_wechat/AI文章封面.png（如存在）
+- 1:1 裁剪坐标固定为 "1008,0,1872,864"
 
 完整工作流:
-  1. Markdown → 微信兼容 HTML (md2wechat_html.py，--essay 模式时加 --essay 参数)
+  1. Markdown → 微信兼容 HTML (md2wechat_html.py，文章模式时加 --article 参数)
   2. 上传封面图（首次）
   3. 推送草稿箱
+
 """
 
 import json
@@ -49,11 +45,9 @@ import urllib.request
 CONFIG_PATH = os.path.join(os.path.expanduser("~/.md_push_wechat"), "config.yaml")
 API_BASE = "https://api.weixin.qq.com"
 COVER_MEDIA_ID_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "cover_media_id.txt")
-ESSAY_COVER_MEDIA_ID_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "essay_cover_media_id.txt")
-AI_COVER_MEDIA_ID_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "ai_cover_media_id.txt")
+ARTICLE_COVER_MEDIA_ID_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "article_cover_media_id.txt")
 DEFAULT_COVER = os.path.join(os.path.expanduser("~/.md_push_wechat"), "封面图.png")
-DEFAULT_ESSAY_COVER = os.path.join(os.path.expanduser("~/.md_push_wechat"), "成语历史典故封面.png")
-DEFAULT_AI_COVER = os.path.join(os.path.expanduser("~/.md_push_wechat"), "AI文章封面.png")
+DEFAULT_ARTICLE_COVER = os.path.join(os.path.expanduser("~/.md_push_wechat"), "AI文章封面.png")
 MD2WECHAT_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "md2wechat_html.py")
 
 # ─── 工具函数 ───────────────────────────────────────────
@@ -128,13 +122,12 @@ def upload_image(access_token, image_path):
     return result["media_id"]
 
 
-def get_cover_media_id(access_token, cover_path, essay_mode=False, ai_mode=False, cmd_media_id=None):
+def get_cover_media_id(access_token, cover_path, article_mode=False, cmd_media_id=None):
     """获取封面图 media_id
 
     优先级：命令行 --media-id > config.yaml wechat.media_id > 上传封面图
-    日报模式：复用已保存的 media_id（同一张封面图）
-    成语模式（essay_mode=True）：每次都上传新封面（每个成语封面图不同）
-    AI文章模式（ai_mode=True）：每次都上传新封面（每个AI文章封面图不同）
+    新闻模式：复用已保存的 media_id（同一张封面图）
+    文章模式（article_mode=True）：每次都上传新封面（每篇文章封面图不同）
     """
     # 1. 命令行指定的 media_id 优先级最高
     if cmd_media_id:
@@ -147,10 +140,10 @@ def get_cover_media_id(access_token, cover_path, essay_mode=False, ai_mode=False
         print(f"使用 config.yaml 配置的 media_id: {config_media_id}")
         return config_media_id
 
-    # 3. AI模式/成语模式：每次都上传新封面图（不复用）
-    cache_file = AI_COVER_MEDIA_ID_FILE if ai_mode else (ESSAY_COVER_MEDIA_ID_FILE if essay_mode else COVER_MEDIA_ID_FILE)
+    # 3. 文章模式：每次都上传新封面图（不复用）
+    cache_file = ARTICLE_COVER_MEDIA_ID_FILE if article_mode else COVER_MEDIA_ID_FILE
 
-    if ai_mode or essay_mode:
+    if article_mode:
         if not os.path.exists(cover_path):
             print(f"ERROR: 封面图不存在: {cover_path}")
             sys.exit(1)
@@ -526,16 +519,12 @@ def main():
         sys.exit(1)
 
     args = sys.argv[1:]
-    essay_mode = False
-    ai_mode = False
+    article_mode = False
 
-    # 识别 --essay 或 --ai 参数（位置不限，但必须在 md 文件之前或之后均可）
-    if "--ai" in args:
-        ai_mode = True
-        args = [a for a in args if a != "--ai"]
-    if "--essay" in args:
-        essay_mode = True
-        args = [a for a in args if a != "--essay"]
+    # 识别模式参数
+    if "--article" in args:
+        article_mode = True
+        args = [a for a in args if a != "--article"]
 
     if not args:
         print(__doc__.strip())
@@ -543,9 +532,9 @@ def main():
 
     md_file = args[0]
     title = None
-    digest = None  # 手动指定的摘要
-    cover = None   # 延迟到确定 essay_mode 后再设默认值
-    media_id = None  # 手动指定的封面 media_id
+    digest = None
+    cover = None
+    media_id = None
 
     i = 1
     while i < len(args):
@@ -566,10 +555,8 @@ def main():
 
     # 根据模式设定默认封面图
     if cover is None:
-        if ai_mode and os.path.exists(DEFAULT_AI_COVER):
-            cover = DEFAULT_AI_COVER
-        elif essay_mode and os.path.exists(DEFAULT_ESSAY_COVER):
-            cover = DEFAULT_ESSAY_COVER
+        if article_mode and os.path.exists(DEFAULT_ARTICLE_COVER):
+            cover = DEFAULT_ARTICLE_COVER
         else:
             cover = DEFAULT_COVER
 
@@ -579,18 +566,14 @@ def main():
 
     # 1. 生成微信兼容 HTML
     base = os.path.splitext(md_file)[0]
-    if ai_mode:
-        html_file = f"{base}_ai_wechat.html"
-        mode_label = "AI文章模式"
-        cmd = [sys.executable, MD2WECHAT_SCRIPT, "--ai", md_file, html_file]
-    elif essay_mode:
-        html_file = f"{base}_essay_wechat.html"
-        mode_label = "长文/成语模式"
-        cmd = [sys.executable, MD2WECHAT_SCRIPT, "--essay", md_file, html_file]
+    if article_mode:
+        html_file = f"{base}_article_wechat.html"
+        mode_label = "文章模式"
+        cmd = [sys.executable, MD2WECHAT_SCRIPT, "--article", md_file, html_file]
     else:
-        html_file = f"{base}_wechat.html"
-        mode_label = "日报模式"
-        cmd = [sys.executable, MD2WECHAT_SCRIPT, md_file, html_file]
+        html_file = f"{base}_news_wechat.html"
+        mode_label = "新闻模式"
+        cmd = [sys.executable, MD2WECHAT_SCRIPT, "--news", md_file, html_file]
 
     print(f"步骤 1: Markdown → 微信兼容 HTML（{mode_label}）")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -617,7 +600,7 @@ def main():
     print(f"\n步骤 2: 获取凭证并处理封面图")
     appid, secret = load_credentials()
     token = get_access_token(appid, secret)
-    thumb_media_id = get_cover_media_id(token, cover, essay_mode=essay_mode, ai_mode=ai_mode, cmd_media_id=media_id)
+    thumb_media_id = get_cover_media_id(token, cover, article_mode=article_mode, cmd_media_id=media_id)
 
     # 4. 推送草稿箱
     print(f"\n步骤 3: 推送草稿箱")
