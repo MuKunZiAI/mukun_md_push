@@ -9,10 +9,10 @@
   # 文章模式
   python3 push_daily.py --article <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
 
-  # 更新已有草稿（追加 --update，其余参数同上）
-  python3 push_daily.py --update <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
-  python3 push_daily.py --update MEDIA_ID <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
-  python3 push_daily.py --article --update <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
+  # 更新已有草稿（追加 --update，注意 input.md 必须在 --update 之前，否则会被误判为 media_id）
+  python3 push_daily.py <input.md> --update [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
+  python3 push_daily.py <input.md> --update MEDIA_ID [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
+  python3 push_daily.py --article <input.md> --update [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
 
 Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title 和 --digest 参数）：
   ---
@@ -22,9 +22,9 @@ Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title
   # 文章标题（仍是必填）
 
 封面图处理:
-- media_id 获取优先级：命令行 --media-id > config.yaml wechat.media_id > 上传封面图
-- 新闻模式：首次上传封面图，media_id 保存到 cover_media_id.txt，后续复用
-- 文章模式：每次都重新上传封面图（每篇文章封面不同），不复用
+- media_id 获取优先级：命令行 --media-id > config.yaml wechat.media_id > config.yaml image_cache.cover > 上传
+- 封面图基于文件内容 MD5 缓存到 config.yaml 的 image_cache.cover 段，同一张图永久复用
+- 正文图片基于文件内容 MD5 缓存到 config.yaml 的 image_cache.content 段
 - 默认封面图: ~/.md_push_wechat/封面图.png
 - 文章模式默认封面图: ~/.md_push_wechat/AI文章封面.png（如存在）
 - 1:1 裁剪坐标固定为 "1008,0,1872,864"
@@ -37,6 +37,7 @@ Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title
 
 """
 
+import hashlib
 import json
 import os
 import re
@@ -56,7 +57,7 @@ ARTICLE_COVER_MEDIA_ID_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat
 DEFAULT_COVER = os.path.join(os.path.expanduser("~/.md_push_wechat"), "封面图.png")
 DEFAULT_ARTICLE_COVER = os.path.join(os.path.expanduser("~/.md_push_wechat"), "AI文章封面.png")
 MD2WECHAT_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "md2wechat_html.py")
-IMAGE_MAP_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "image_asset_map.json")
+IMAGE_MAP_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "image_asset_map.json")  # 旧缓存文件，迁移后不再使用
 DRAFT_MEDIA_ID_FILE = os.path.join(os.path.expanduser("~/.md_push_wechat"), "draft_media_id.txt")
 
 SUPPORTED_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
@@ -171,7 +172,7 @@ def upload_content_image(access_token, image_path):
     return image_url
 
 
-# ─── 图片解析 / 上传 / 缓存 ─────────────────────────────
+# ─── 图片解析工具 ───────────────────────────────────────
 
 def _normalize_image_token(token):
     """规范化图片标识文本（描述或文件名）用于匹配"""
@@ -251,27 +252,225 @@ def _resolve_md_image_to_file(md_file, img_target, img_alt, image_paths):
     return None, "missing"
 
 
-def _load_image_asset_map():
-    """读取本地图片素材映射缓存"""
-    if not os.path.exists(IMAGE_MAP_FILE):
-        return {}
+# ─── 图片缓存（基于 config.yaml） ────────────────────────
+
+def _compute_file_hash(filepath):
+    """计算文件内容 MD5，用于跨路径识别同一图片"""
+    md5 = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            md5.update(chunk)
+    return md5.hexdigest()
+
+
+def _load_full_config():
+    """读取 config.yaml 全部内容，返回 (lines, wechat_section_start, wechat_section_end)"""
+    if not os.path.exists(CONFIG_PATH):
+        return [], -1, -1
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    return lines
+
+
+def _parse_image_cache(lines):
+    """从 config.yaml 行列表中解析 image_cache 段
+
+    返回: {"cover": {hash: media_id}, "content": {hash: url}}
+    """
+    cache = {"cover": {}, "content": {}}
+    # 找到 image_cache: 行
+    in_section = False
+    in_subsection = None  # 'cover' or 'content'
+    indent = None
+    for i, line in enumerate(lines):
+        stripped = line.rstrip("\n").rstrip("\r")
+        if re.match(r'^image_cache:\s*$', stripped):
+            in_section = True
+            indent = len(line) - len(line.lstrip())
+            continue
+        if not in_section:
+            continue
+        if not stripped or stripped.startswith("#"):
+            continue
+        # 检测是否已出 image_cache 段（缩进回到顶层）
+        cur_indent = len(line) - len(line.lstrip())
+        if cur_indent <= indent and in_section and not in_subsection:
+            break
+        # 检测子段
+        cover_match = re.match(r'^\s+cover:\s*$', stripped)
+        content_match = re.match(r'^\s+content:\s*$', stripped)
+        if cover_match:
+            in_subsection = "cover"
+            continue
+        if content_match:
+            in_subsection = "content"
+            continue
+        # 解析键值对
+        if in_subsection and cur_indent > indent + 2:
+            kv_match = re.match(r'^\s+(\S+):\s*["\']?(\S+)["\']?\s*$', stripped)
+            if kv_match:
+                key, val = kv_match.group(1), kv_match.group(2).strip("\"'")
+                if in_subsection in cache:
+                    cache[in_subsection][key] = val
+
+    return cache
+
+
+def _save_image_cache_to_config(cache):
+    """将 image_cache 写入 config.yaml
+
+    缓存结构:
+      image_cache:
+        cover:
+          <file_hash>: "<media_id>"
+        content:
+          <file_hash>: "<url>"
+
+    1. 若已有 image_cache 段，替换之
+    2. 若没有，追加到文件末尾
+    """
+    lines = _load_full_config()
+
+    # 找到 image_cache 段的位置
+    section_start = -1
+    section_end = -1
+    wechat_indent = 0
+    for i, line in enumerate(lines):
+        if re.match(r'^image_cache:\s*$', line.rstrip("\n")):
+            section_start = i
+            section_indent = len(line) - len(line.lstrip())
+            # 查找该段结束位置（下一个同级或更上级的 key）
+            for j in range(i + 1, len(lines)):
+                stripped = lines[j].lstrip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                cur_indent = len(lines[j]) - len(stripped)
+                if cur_indent <= section_indent:
+                    section_end = j
+                    break
+            if section_end == -1:
+                section_end = len(lines)
+            break
+        if re.match(r'^wechat:\s*$', line.rstrip("\n")):
+            wechat_indent = len(line) - len(line.lstrip())
+
+    # 构建新的 image_cache 段
+    new_section = []
+    new_section.append("image_cache:\n")
+    if cache.get("cover"):
+        new_section.append("    cover:\n")
+        for h, mid in sorted(cache["cover"].items()):
+            new_section.append(f'        {h}: "{mid}"\n')
+    if cache.get("content"):
+        new_section.append("    content:\n")
+        for h, url in sorted(cache["content"].items()):
+            new_section.append(f'        {h}: "{url}"\n')
+
+    # 空缓存：移除 image_cache 段
+    no_cache = not cache.get("cover") and not cache.get("content")
+
+    if section_start >= 0:
+        if no_cache:
+            # 删除 image_cache 段
+            lines = lines[:section_start] + lines[section_end:]
+        else:
+            # 替换 image_cache 段
+            lines = lines[:section_start] + new_section + lines[section_end:]
+    elif not no_cache:
+        # 追加到文件末尾（保留 trailing newline）
+        if lines and not lines[-1].endswith("\n"):
+            lines.append("\n")
+        lines.append("\n")
+        lines.extend(new_section)
+
     try:
-        with open(IMAGE_MAP_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
+        folder = os.path.dirname(CONFIG_PATH)
+        os.makedirs(folder, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except (PermissionError, OSError) as e:
+        print(f"WARNING: 无法保存图片缓存到 config.yaml: {e}")
+
+
+def _migrate_old_image_cache():
+    """将旧 image_asset_map.json 迁移到 config.yaml"""
+    old_map = {}
+    if os.path.exists(IMAGE_MAP_FILE):
+        try:
+            with open(IMAGE_MAP_FILE, "r", encoding="utf-8") as f:
+                old_map = json.load(f)
+        except Exception:
+            pass
+
+    if not old_map:
+        return
+
+    # 检查旧 map 中的每个文件是否存在，计算 hash 并迁移
+    lines = _load_full_config()
+    current_cache = _parse_image_cache(lines)
+    migrated = 0
+
+    for filepath, url in old_map.items():
+        if not os.path.exists(filepath):
+            continue
+        try:
+            fhash = _compute_file_hash(filepath)
+        except Exception:
+            continue
+        if fhash not in current_cache["content"]:
+            current_cache["content"][fhash] = url
+            migrated += 1
+
+    if migrated > 0:
+        _save_image_cache_to_config(current_cache)
+        print(f"已迁移 {migrated} 条旧图片缓存到 config.yaml")
+        # 删除旧缓存文件
+        try:
+            os.remove(IMAGE_MAP_FILE)
+            print(f"已删除旧缓存文件: {IMAGE_MAP_FILE}")
+        except OSError:
+            pass
+
+    # 迁移旧封面图缓存 txt 文件
+    for cache_file in [COVER_MEDIA_ID_FILE, ARTICLE_COVER_MEDIA_ID_FILE]:
+        if not os.path.exists(cache_file):
+            continue
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                old_media_id = f.read().strip()
+        except Exception:
+            continue
+        if not old_media_id:
+            continue
+        # 尝试找到对应的封面图文件
+        cover_paths = [DEFAULT_COVER, DEFAULT_ARTICLE_COVER]
+        for cp in cover_paths:
+            if not os.path.exists(cp):
+                continue
+            try:
+                fhash = _compute_file_hash(cp)
+            except Exception:
+                continue
+            if fhash not in current_cache["cover"]:
+                current_cache["cover"][fhash] = old_media_id
+                _save_image_cache_to_config(current_cache)
+                print(f"已迁移封面图缓存到 config.yaml (hash: {fhash[:8]}...)")
+        try:
+            os.remove(cache_file)
+        except OSError:
+            pass
+
+
+# ─── 正文图片解析 / 上传 ─────────────────────────────────
+
+def _load_image_asset_map():
+    """已弃用：图片缓存已迁移到 config.yaml 的 image_cache 段"""
+    return {}
 
 
 def _save_image_asset_map(image_map):
-    """保存图片素材映射缓存（写入失败时优雅降级，不影响主流程）"""
-    try:
-        folder = os.path.dirname(IMAGE_MAP_FILE)
-        os.makedirs(folder, exist_ok=True)
-        with open(IMAGE_MAP_FILE, "w", encoding="utf-8") as f:
-            json.dump(image_map, f, ensure_ascii=False, indent=2)
-    except (PermissionError, OSError) as e:
-        print(f"WARNING: 无法保存图片缓存: {e}")
+    """已弃用：图片缓存已迁移到 config.yaml 的 image_cache 段"""
+    pass
 
 
 def replace_local_images_with_wechat_assets(md_file, html_content, access_token):
@@ -280,8 +479,8 @@ def replace_local_images_with_wechat_assets(md_file, html_content, access_token)
     工作流：
     1. 从原始 Markdown 提取所有图片引用
     2. 解析到本地文件（支持相对路径、alt 模糊匹配）
-    3. 查缓存（image_asset_map.json），命中则复用 URL
-    4. 未命中则上传到微信永久素材库 cgi-bin/material/add_material
+    3. 计算文件内容 MD5，查 config.yaml image_cache.content
+    4. 命中则复用 URL；未命中则上传到永久素材库并写入缓存
     5. 将 HTML 中的图片 src 替换为微信素材 URL
     """
     with open(md_file, "r", encoding="utf-8") as f:
@@ -293,8 +492,9 @@ def replace_local_images_with_wechat_assets(md_file, html_content, access_token)
         return html_content
 
     image_paths = _list_local_images(md_file)
-    image_map = _load_image_asset_map()
-    updated_map = False
+    lines = _load_full_config()
+    cache = _parse_image_cache(lines)
+    updated = False
     replacements = {}
 
     for alt, target in refs:
@@ -311,25 +511,23 @@ def replace_local_images_with_wechat_assets(md_file, html_content, access_token)
             print(f"WARNING: 未找到图片文件，跳过: alt='{alt}', target='{target}'")
             continue
 
-        cache_key = os.path.abspath(resolved)
-        wechat_url = image_map.get(cache_key, "")
+        fhash = _compute_file_hash(resolved)
+        wechat_url = cache["content"].get(fhash, "")
         if not wechat_url:
             print(f"上传正文图片: {resolved}")
             wechat_url = upload_content_image(access_token, resolved)
-            image_map[cache_key] = wechat_url
-            updated_map = True
+            cache["content"][fhash] = wechat_url
+            updated = True
             print(f"正文图片 URL: {wechat_url}")
         else:
-            print(f"复用已上传正文图片: {resolved}")
+            print(f"复用已缓存正文图片: {resolved} (hash: {fhash[:8]}...)")
 
         replacements[src_key] = wechat_url
-        # 兼容 HTML 中可能出现的 URL 编码形式
         replacements[urllib.parse.quote(src_key, safe="/:@+")] = wechat_url
         replacements[urllib.parse.unquote(src_key)] = wechat_url
 
-    if updated_map:
-        _save_image_asset_map(image_map)
-        print(f"正文图片映射已保存: {IMAGE_MAP_FILE}")
+    if updated:
+        _save_image_cache_to_config(cache)
 
     if not replacements:
         return html_content
@@ -345,55 +543,45 @@ def replace_local_images_with_wechat_assets(md_file, html_content, access_token)
 def get_cover_media_id(access_token, cover_path, article_mode=False, cmd_media_id=None):
     """获取封面图 media_id
 
-    优先级：命令行 --media-id > config.yaml wechat.media_id > 上传封面图
-    新闻模式：复用已保存的 media_id（同一张封面图）
-    文章模式（article_mode=True）：每次都上传新封面（每篇文章封面图不同）
+    优先级：命令行 --media-id > config.yaml wechat.media_id > config.yaml image_cache.cover > 上传
+
+    封面图基于文件内容 MD5 缓存到 config.yaml image_cache.cover 段，
+    同一张封面图无论路径如何变化都会被识别并复用。
     """
     # 1. 命令行指定的 media_id 优先级最高
     if cmd_media_id:
         print(f"使用命令行指定的 media_id: {cmd_media_id}")
         return cmd_media_id
 
-    # 2. config.yaml 中配置的 media_id
+    # 2. config.yaml 中配置的固定 media_id
     config_media_id = load_config_media_id()
     if config_media_id:
         print(f"使用 config.yaml 配置的 media_id: {config_media_id}")
         return config_media_id
 
-    # 3. 文章模式：每次都上传新封面图（不复用）
-    cache_file = ARTICLE_COVER_MEDIA_ID_FILE if article_mode else COVER_MEDIA_ID_FILE
-
-    if article_mode:
-        if not os.path.exists(cover_path):
-            print(f"ERROR: 封面图不存在: {cover_path}")
-            sys.exit(1)
-        print(f"上传封面图: {cover_path}")
-        media_id = upload_image(access_token, cover_path)
-        print(f"封面图 media_id: {media_id}")
-        return media_id
-
-    # 日报模式：检查是否有已保存的 media_id
-    if os.path.exists(cache_file):
-        with open(cache_file, "r", encoding="utf-8") as f:
-            saved = f.read().strip()
-        if saved:
-            print(f"复用已保存的封面图 media_id: {saved}")
-            return saved
-    
-    # 上传新封面图
+    # 3. 检查封面图是否存在
     if not os.path.exists(cover_path):
         print(f"ERROR: 封面图不存在: {cover_path}")
-        print("提示: 在当前目录下放一张名为 '封面图.png' 的图片，或用 --cover 指定路径")
         sys.exit(1)
-    
+
+    # 4. 查 config.yaml 缓存（基于文件内容 hash）
+    lines = _load_full_config()
+    cache = _parse_image_cache(lines)
+    fhash = _compute_file_hash(cover_path)
+    cached_media_id = cache["cover"].get(fhash, "")
+    if cached_media_id:
+        print(f"复用已缓存封面图 media_id: {cached_media_id} (hash: {fhash[:8]}...)")
+        return cached_media_id
+
+    # 5. 上传封面图并缓存
     print(f"上传封面图: {cover_path}")
     media_id = upload_image(access_token, cover_path)
-    
-    # 保存 media_id
-    with open(cache_file, "w", encoding="utf-8") as f:
-        f.write(media_id)
-    print(f"封面图 media_id 已保存到: {cache_file}")
-    
+    print(f"封面图 media_id: {media_id}")
+
+    cache["cover"][fhash] = media_id
+    _save_image_cache_to_config(cache)
+    print(f"封面图缓存已保存到 config.yaml (hash: {fhash[:8]}...)")
+
     return media_id
 
 
@@ -608,6 +796,9 @@ def main():
     if not os.path.exists(md_file):
         print(f"ERROR: Markdown 文件不存在: {md_file}")
         sys.exit(1)
+
+    # 0. 迁移旧缓存到 config.yaml（首次自动执行）
+    _migrate_old_image_cache()
 
     # 1. 生成微信兼容 HTML
     base = os.path.splitext(md_file)[0]

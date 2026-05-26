@@ -65,10 +65,10 @@ python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2article_html.py --config /path/to/conf
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
 
-# 更新已有草稿（追加 --update）
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --update <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --update MEDIA_ID <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article --update <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST]
+# 更新已有草稿（追加 --update，注意 input.md 必须在 --update 之前，否则会被误判为 media_id）
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> --update MEDIA_ID [--title TITLE] [--cover COVER] [--digest DIGEST]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
 ```
 
 支持 Markdown frontmatter 提取标题和摘要：
@@ -98,9 +98,13 @@ digest: 手动摘要（80字以内）
 **图片处理流程**（推送时自动执行）：
 1. 从原始 Markdown 提取 `![](url)` 图片引用
 2. 解析到本地文件（支持相对路径、绝对路径、alt 描述模糊匹配）
-3. 查缓存 `~/.md_push_wechat/image_asset_map.json`，命中则直接复用微信 CDN URL
-4. 未命中则上传到微信图文消息图片接口 `cgi-bin/media/uploadimg`
-5. 将 HTML 中的 `src` 替换为微信 CDN URL，并保存缓存
+3. 计算文件内容 MD5，查缓存 `~/.md_push_wechat/config.yaml` 中 `image_cache.content`，命中则直接复用微信 CDN URL
+4. 未命中则上传到微信永久素材库 `cgi-bin/material/add_material`
+5. 将 HTML 中的 `src` 替换为微信 CDN URL，并保存缓存到 config.yaml
+
+**封面图缓存**：
+- 封面图 media_id 基于文件内容 MD5 缓存到 config.yaml 的 `image_cache.cover` 段
+- 同一张封面图无论路径如何变化都会被识别并永久复用，无需重复上传
 
 **草稿更新（`--update`）**：
 - `--update [MEDIA_ID]`：更新已有草稿而非新建。MEDIA_ID 可选，不传则自动读取上次新建时保存的 `~/.md_push_wechat/draft_media_id.txt`
