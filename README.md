@@ -18,7 +18,9 @@
 
 - 📰 **两种转换模式**：新闻模式（默认，板块化日报）和文章模式（长文叙事，配色可配置）
 - 🎨 **微信样式兼容**：所有 CSS 内联，使用 `<section>` 替代 `<div>`，规避微信渲染限制
-- 📤 **草稿箱推送**：转换后直接上传到微信公众号草稿箱，手动补图即可发布
+- 📤 **草稿箱推送**：转换后直接上传到微信公众号草稿箱，即可发布
+- 🖼️ **图片自动上传**：自动解析 Markdown 中的本地图片引用，上传到微信永久素材库并替换为 CDN URL
+- 💾 **素材智能缓存**：图片 + 封面图基于文件内容 MD5 缓存到 config.yaml，同一张图片不会重复上传
 - 📝 **Frontmatter 支持**：可在 Markdown 文件顶部声明标题和摘要
 - 🔧 **多平台兼容**：同时支持 WorkBuddy、Claude Code、OpenCode、Codex CLI
 
@@ -225,6 +227,74 @@ rm -rf /tmp/mukun_md_push
 
 </details>
 
+#### 🎨 预设样式速查（自然语言 → 配置文件）
+
+文章模式内置 3 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
+
+| 预设 | 配置文件 | 视觉特征 | 自然语言触发词 |
+|------|---------|---------|--------------|
+| 默认 | `references/article_default.yaml` | 白底灰字 + 棕色标签标题 | "默认样式"、"白色"、"白底"、"常规" |
+| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 古铜暖棕强调色 | "怀旧"、"泛黄"、"古风"、"历史"、"报纸"、"典籍" |
+| 科技蓝紫 | `references/article_modern.yaml` | 冷色调蓝紫渐变 + 深色封面 | "科技"、"蓝紫"、"现代"、"AI"、"炫酷" |
+
+```bash
+# 直接用 --config 引用预设
+python3 scripts/md2wechat_html.py --config references/article_nostalgic.yaml --article story.md
+python3 scripts/push_daily.py --config references/article_modern.yaml --article story.md
+```
+
+#### 🔧 如何新增自定义配置
+
+内置的 3 种预设样式不能满足需求时，有两种方式新增自定义配置：
+
+**方式一：修改全局配置文件**（影响所有未指定 `--config` 的文章模式推送）
+
+直接编辑 `~/.md_push_wechat/config.yaml`，在 `style:` 下增加或修改 `article:` 段：
+
+```yaml
+# ~/.md_push_wechat/config.yaml
+wechat:
+  appid: "wx..."
+  secret: "..."
+
+style:
+  article:
+    bg: "#f8f9fa"
+    accent: "rgb(0,150,136)"
+    hero_bg: "rgb(0,150,136)"
+    cover_label: "我的专栏"
+```
+
+**方式二：创建独立配置文件**（推荐，可版本管理、可分享）
+
+1. 从 `references/` 目录复制一个预设配置文件（如 `article_default.yaml`）
+2. 修改其中的颜色、字体、封面标签等字段
+3. 通过 `--config` 参数指定该文件：
+
+```bash
+# 转换 HTML
+python3 scripts/md2wechat_html.py --config /path/to/my_style.yaml --article my_article.md
+
+# 转换 + 推送
+python3 scripts/push_daily.py --config /path/to/my_style.yaml --article my_article.md --digest "..."
+```
+
+**最简自定义示例**（只覆盖你想改的字段，其余用代码默认值）：
+
+```yaml
+# my_style.yaml
+style:
+  article:
+    bg: "#f0f4f8"
+    accent: "rgb(22,138,173)"
+    hero_bg: "rgb(22,138,173)"
+    cover_label: "技术随笔"
+```
+
+可覆盖字段见上方「文章模式 style.article 配置项参考」表格。所有颜色支持 HEX (`#rrggbb`) 或 `rgb(r,g,b)` 格式。
+
+> **提示**：如果有多个系列文章需要不同配色，建议用方式二（独立配置文件），推送时分别指定 `--config`。
+
 ## 🚀 使用方式
 
 ### 仅转换 HTML
@@ -254,6 +324,30 @@ wechat:
   secret: your_secret
 ```
 
+#### 图片自动上传与缓存
+
+脚本在推送时会自动处理 Markdown 中的本地图片引用（`![](path/to/image.png)`）：
+
+1. 从 Markdown 中解析所有 `![](url)` 图片引用
+2. 解析到本地文件（支持相对路径、绝对路径、alt 描述模糊匹配）
+3. 计算文件内容的 **MD5 hash**，先在 `config.yaml` 的 `image_cache.content` 中查找缓存
+4. **命中缓存** → 直接复用微信 CDN URL，无需重新上传
+5. **未命中** → 通过微信永久素材接口 `cgi-bin/material/add_material` 上传，获取 CDN URL 后写入缓存
+
+封面图同理，基于文件内容 MD5 缓存到 `image_cache.cover` 段，同一张封面图无论路径如何变化都会被识别并永久复用。
+
+**缓存结构**（自动写入 `config.yaml`，无需手动维护）：
+
+```yaml
+image_cache:
+    cover:
+        <md5_hash>: "<media_id>"
+    content:
+        <md5_hash>: "<CDN URL>"
+```
+
+> **关键优势**：同一张图片无论放在哪个目录、叫什么文件名，只要文件内容相同，MD5 hash 就相同，永远不会被重复上传。彻底避免多次推送时图片重复上传导致微信公众号永久素材库被打爆的问题。
+
 ```bash
 # 新闻模式推送
 python3 scripts/push_daily.py article.md
@@ -279,6 +373,10 @@ mukun_md_push/
 │   ├── md2news_html.py          # 新闻模式转换器
 │   ├── md2article_html.py       # 文章模式转换器
 │   └── push_daily.py            # 转换 + 推送草稿箱脚本
+├── references/                  # 文章模式预设样式（自然语言 → 配置文件）
+│   ├── article_default.yaml     # 默认样式（白底灰字）
+│   ├── article_nostalgic.yaml   # 泛黄怀旧样式（古卷暖棕）
+│   └── article_modern.yaml      # 科技蓝紫样式（冷色调）
 ├── examples/
 │   ├── config_example.yaml              # 完整配置示例（news + article 所有可配置项）
 │   ├── default/                         # 默认配色示例（源文件 + 生成 HTML）
@@ -301,6 +399,12 @@ mukun_md_push/
 
 ### 2026-05-26
 
+- **新增 `references/` 预设样式目录**：文章模式 3 种预设样式（默认/泛黄怀旧/科技蓝紫）独立为 YAML 配置文件，SKILL.md 中加入自然语言 → 样式映射规则，用户说"怀旧风格""科技蓝紫"等即可自动匹配。也可直接 `--config references/article_nostalgic.yaml` 使用
+- **移除 20000 字符拆分限制**：删除了 `push_daily.py` 中的 `MAX_CONTENT_LENGTH`、`split_html_content`、`_push_multi_drafts`、`_truncate_title` 等函数，以及 `md2article_html.py`/`md2news_html.py` 中的字符限制警告。现在任意长度的内容都可以一次性推送，不再自动拆分
+- **图片素材自动上传与 MD5 缓存**：推送时自动解析 Markdown 中的本地图片引用，通过微信永久素材接口 `cgi-bin/material/add_material` 上传。基于文件内容 MD5 hash 缓存到 `config.yaml` 的 `image_cache.content` 段，同一张图片仅首次上传，后续直接复用 CDN URL
+- **封面图 MD5 缓存**：封面图 media_id 同样基于文件内容 MD5 缓存到 `config.yaml` 的 `image_cache.cover` 段，同一张封面图永久复用
+- **旧缓存自动迁移**：首次运行时自动将旧的 `image_asset_map.json` 和 `cover_media_id.txt` 迁移到 `config.yaml` 的新缓存格式
+- **修复 `--update` 参数顺序 bug**：`--update` 放在输入文件之前会误将文件名当作 media_id。统一约定 `input.md --update` 顺序，文档中所有示例已更新
 - **新闻模式中文标题配置化**：`来源：` 标签从代码硬编码改为从 `style.news.source_label` 读取（默认 "来源："），Markdown 来源行检测前缀改为从 `source_prefixes` 列表读取（默认 ["来源：", "来源:"]）
 - **HTML 模板清理**：移除新闻模式模板中的中文 HTML 注释
 

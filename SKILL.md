@@ -27,6 +27,31 @@ allowed-tools: Read, Bash, Write
 | 新闻模式 | `--news`（默认） | `md2news_html.py` | AI 周报、行业动态汇总（板块化日报） |
 | 文章模式 | `--article` | `md2article_html.py` | 技术实践、成语典故、长文叙事（配色通过 config.yaml 控制）
 
+### 文章模式预设样式
+
+文章模式内置 3 种预设样式，用户用自然语言描述即可自动匹配。每个预设对应 `references/` 目录下一个独立的 YAML 配置文件，既可被 SKILL.md 用自然语言匹配，也可直接通过 `--config` 传入脚本使用。
+
+| 预设 | 配置文件 | 视觉特征 | 自然语言触发词（含任一即匹配） |
+|------|---------|---------|--------------------------|
+| 默认 | `references/article_default.yaml` | 白底灰字 + 棕色标签标题 | 默认、默认样式、白色、白底、常规、普通 |
+| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 古铜暖棕强调色 | 怀旧、泛黄、古风、历史、报纸、典籍、复古 |
+| 科技蓝紫 | `references/article_modern.yaml` | 冷色调蓝紫渐变 + 深色封面 | 科技、蓝紫、现代、AI、技术、炫酷、深色 |
+
+**匹配规则**：
+- 用户提及"默认样式"/"白色"/"白底"/"常规" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_default.yaml`
+- 用户提及"怀旧"/"泛黄"/"古风"/"历史"/"报纸"/"典籍"/"复古" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml`
+- 用户提及"科技"/"蓝紫"/"现代"/"AI"/"技术"/"炫酷"/"深色" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_modern.yaml`
+- 用户未提及任何风格关键词 → **默认使用 `references/article_default.yaml`**
+
+**执行方式**：识别到风格关键词后，通过 `--config` 参数传入对应的 reference 文件：
+```bash
+# 示例：用户说"用怀旧风格转成微信公众号 HTML"
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --config ${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml --article story.md
+
+# 推送时同理
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --config ${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml --article story.md --digest "..."
+```
+
 ## 技能 1：Markdown → 微信 HTML
 
 调用脚本：
