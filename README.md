@@ -198,6 +198,8 @@ rm -rf /tmp/mukun_md_push
 | `section_colors` | 见默认值 | 板块名→颜色映射（map） |
 | `summary_colors` | 见默认值 | 总结表格类别→颜色映射（map） |
 | `summary_sections` | `["总结"]` | 触发总结表格渲染的关键词列表 |
+| `source_label` | `"来源："` | 来源标注的显示前缀 |
+| `source_prefixes` | `["来源：", "来源:"]` | Markdown 中来源行的检测前缀列表 |
 
 </details>
 
@@ -296,6 +298,11 @@ mukun_md_push/
 ```
 
 ## 📋 修改说明
+
+### 2026-05-26
+
+- **新闻模式中文标题配置化**：`来源：` 标签从代码硬编码改为从 `style.news.source_label` 读取（默认 "来源："），Markdown 来源行检测前缀改为从 `source_prefixes` 列表读取（默认 ["来源：", "来源:"]）
+- **HTML 模板清理**：移除新闻模式模板中的中文 HTML 注释
 
 ### 2026-05-25
 

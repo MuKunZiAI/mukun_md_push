@@ -58,6 +58,12 @@ style:
     summary_sections:
       - 总结
 
+    # ── 来源标注 ──
+    source_label: "来源："                    # 来源显示前缀
+    source_prefixes:                         # Markdown 中来源行的检测前缀
+      - "来源："
+      - "来源:"
+
   # ╔══════════════════════════════════════════════════════════════════════════╗
   # ║  文章模式（article）：长文叙事，统一渲染，配色可配置                    ║
   # ║  用法：python3 scripts/md2article_html.py <input.md>                   ║

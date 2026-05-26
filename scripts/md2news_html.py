@@ -54,6 +54,12 @@ DEFAULT_SUMMARY_COLORS = {
 DEFAULT_SUMMARY_SECTIONS = ["总结"]
 
 
+def _extract_date(meta_text):
+    """从 meta 文本中提取日期（YYYY-MM-DD 格式），无匹配返回空字符串"""
+    m = re.search(r'(\d{4}-\d{2}-\d{2})', meta_text)
+    return m.group(1) if m else ""
+
+
 # ─── 新闻模式 HTML 模板 ────────────────────────────────
 
 _NEWS_TEMPLATE = """<!DOCTYPE html>
@@ -63,20 +69,20 @@ _NEWS_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body style="margin:0;padding:24px 16px;background:__BG__;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-indent:0">
 
-<!-- 封面标题区：报纸报头风格 -->
+<!-- hero / cover -->
 <section style="background:__HERO_BG__;padding:24px 20px 20px;margin:0 0 6px 0;border-top:4px solid __RULE__">
   <p style="margin:0 0 10px 0;font-size:11px;color:__RULE__;letter-spacing:2px;text-align:center">__COVER_LABEL__</p>
   <h1 style="margin:0;font-size:__TITLE_FONT_SIZE__;font-weight:bold;color:#faf7f0;line-height:1.5;text-align:center;border:none">{title}</h1>
 </section>
 
-<!-- 信息来源栏 -->
+<!-- meta -->
 <section style="background:__CARD__;padding:10px 16px;margin:0 0 24px 0;border:1px solid __RULE__;border-top:none">
   <p style="margin:0;font-size:12px;color:__MUTED__;line-height:1.7;text-align:center;letter-spacing:0.5px">{meta}</p>
 </section>
 
 {content}
 
-<!-- 底部说明：报尾 -->
+<!-- footer -->
 <section style="border-top:2px solid __RULE__;margin:24px 0 0 0;padding:12px 0 0 0;text-align:center">
   <p style="margin:0;font-size:11px;color:__CAPTION__;letter-spacing:1px">{footer}</p>
 </section>
@@ -103,8 +109,10 @@ def _build_template(s):
 
 # ─── Markdown 解析 ─────────────────────────────────────
 
-def parse_markdown(md_text):
+def parse_markdown(md_text, source_prefixes=None):
     """解析新闻 Markdown，返回结构化数据"""
+    if source_prefixes is None:
+        source_prefixes = ["来源：", "来源:"]
     lines = md_text.strip().split('\n')
 
     title = ""
@@ -176,9 +184,14 @@ def parse_markdown(md_text):
                 current_item["table"] = parse_table(table_lines)
             table_lines = []
 
-        if line.startswith('来源：') or line.startswith('来源:'):
-            if current_item:
-                current_item["source"] = line[3:].strip()
+        source_matched = False
+        for prefix in source_prefixes:
+            if line.startswith(prefix):
+                if current_item:
+                    current_item["source"] = line[len(prefix):].strip()
+                source_matched = True
+                break
+        if source_matched:
             i += 1
             continue
 
@@ -314,7 +327,7 @@ def render_table(table_data, s):
     return html
 
 
-def render_item(item, color, s):
+def render_item(item, color, s, date=""):
     """渲染单条新闻为 HTML 卡片"""
     card_fs = s.get("card_font_size", s["text_font_size"])
     html = f'<section style="background:{s["card"]};padding:16px;margin:0 0 12px 0;border-left:3px solid {color};border-bottom:1px solid #ede5d0;font-size:{card_fs};color:{s["dark"]};line-height:1.9">\n'
@@ -328,8 +341,10 @@ def render_item(item, color, s):
         html += '  ' + render_table(item["table"], s).replace('\n', '\n  ').rstrip() + '\n'
 
     if item["source"]:
+        source_label = s.get("source_label", "来源：")
         source_html = format_text(item["source"], s)
-        html += f'  <p style="margin:8px 0 0 0;font-size:11px;color:{s["caption"]};letter-spacing:0.5px">来源：{source_html}</p>\n'
+        date_suffix = f" | {date}" if date else ""
+        html += f'  <p style="margin:8px 0 0 0;font-size:11px;color:{s["caption"]};letter-spacing:0.5px">{source_label}{source_html}{date_suffix}</p>\n'
 
     html += '</section>\n'
     return html
@@ -374,6 +389,9 @@ def generate_html(data, s):
     """生成微信兼容 HTML（新闻模式）"""
     sections_html = []
 
+    # 从 meta 提取日期
+    date = _extract_date(data.get("meta", ""))
+
     for section in data["sections"]:
         section_name = section["name"]
         section_colors = s.get("section_colors", DEFAULT_SECTION_COLORS)
@@ -392,7 +410,7 @@ def generate_html(data, s):
                 section_html += render_summary_table(section["items"][0], s)
         else:
             for item in section["items"]:
-                section_html += render_item(item, color, s)
+                section_html += render_item(item, color, s, date=date)
 
         if section != data["sections"][-1]:
             section_html += f'<hr style="border:none;border-top:1px solid {s["rule"]};margin:20px 0" />\n'
@@ -436,6 +454,8 @@ def load_news_style_config(config_path=None):
         "section_colors": dict(DEFAULT_SECTION_COLORS),
         "summary_colors": dict(DEFAULT_SUMMARY_COLORS),
         "summary_sections": list(DEFAULT_SUMMARY_SECTIONS),
+        "source_label": "来源：",
+        "source_prefixes": ["来源：", "来源:"],
     }
 
     if not os.path.exists(config_path):
@@ -606,7 +626,7 @@ def main():
     md_text = strip_frontmatter(md_text)
     s = load_news_style_config(config_path=config_path)
 
-    data = parse_markdown(md_text)
+    data = parse_markdown(md_text, source_prefixes=s.get("source_prefixes", ["来源：", "来源:"]))
     html = generate_html(data, s)
     print(f"生成成功（新闻模式）: {output_file}")
     print(f"   标题: {data['title']}")
