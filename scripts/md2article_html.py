@@ -88,6 +88,8 @@ def parse_article(md_text):
     - **粗体**
     - 表格
     - 代码块
+    - 有序列表 (1. 2. 3. ...)
+    - 无序列表 (- 或 * 或 +)
     返回 {"title": str, "blocks": [...]}
     """
     lines = md_text.strip().split('\n')
@@ -211,6 +213,30 @@ def parse_article(md_text):
             flush_table()
             in_table = False
 
+        # 有序列表 (1. 2. 3. ...)
+        ol_match = re.match(r'^(\d+)\.\s+(.+)$', stripped)
+        if ol_match:
+            flush_para()
+            flush_table()
+            item_text = ol_match.group(2)
+            if blocks and blocks[-1]["type"] == "ol":
+                blocks[-1]["items"].append(item_text)
+            else:
+                blocks.append({"type": "ol", "items": [item_text]})
+            continue
+
+        # 无序列表 (- 或 * 或 +)
+        ul_match = re.match(r'^[\-\*\+]\s+(.+)$', stripped)
+        if ul_match:
+            flush_para()
+            flush_table()
+            item_text = ul_match.group(1)
+            if blocks and blocks[-1]["type"] == "ul":
+                blocks[-1]["items"].append(item_text)
+            else:
+                blocks.append({"type": "ul", "items": [item_text]})
+            continue
+
         # 空行
         if not stripped:
             flush_para()
@@ -322,7 +348,7 @@ def render_blockquote(text, s):
 
 
 def render_code_block(code):
-    """渲染代码块"""
+    """渲染代码块，长行支持横向滚动不换行"""
     if not code:
         return ""
 
@@ -333,10 +359,10 @@ def render_code_block(code):
         line = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', line)
         html_lines.append(line)
 
-    code_html = '<br>'.join(html_lines)
+    code_html = '\n'.join(html_lines)
 
-    html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto">
-  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre">{code_html}</code>
+    html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre;word-break:normal;overflow-wrap:normal">{code_html}</code>
 </section>'''
     return html
 
@@ -412,6 +438,26 @@ def generate_html(data, s):
             formatted = format_text(escape_html(text), s)
             content_parts.append(
                 f'<p style="margin:0 0 14px 0">{formatted}</p>'
+            )
+        elif btype == "ol":
+            items_html = []
+            for item_text in block["items"]:
+                formatted = format_text(escape_html(item_text), s)
+                items_html.append(f'<li style="margin:0 0 6px 0;line-height:1.9">{formatted}</li>')
+            content_parts.append(
+                '<ol style="margin:0 0 14px 0;padding-left:24px">\n'
+                + '\n'.join(items_html)
+                + '\n</ol>'
+            )
+        elif btype == "ul":
+            items_html = []
+            for item_text in block["items"]:
+                formatted = format_text(escape_html(item_text), s)
+                items_html.append(f'<li style="margin:0 0 6px 0;line-height:1.9">{formatted}</li>')
+            content_parts.append(
+                '<ul style="margin:0 0 14px 0;padding-left:24px">\n'
+                + '\n'.join(items_html)
+                + '\n</ul>'
             )
 
     content = '\n'.join(content_parts)
