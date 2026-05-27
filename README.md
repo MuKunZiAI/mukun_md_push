@@ -30,7 +30,7 @@
 
 > **注意**：各工具的 skill 目录名（`mukun-md-push-wechat`）即仓库中的 `SKILL.md` 文件夹名。
 
-### 通用方式（适用于任何 AI 智能体）
+### 通用方式，用自然语言安装（适用于任何 AI 智能体）
 
 无需安装，直接在对话中把以下内容发给任意 AI 智能体：
 
@@ -41,7 +41,9 @@ https://raw.githubusercontent.com/MuKunZiAI/mukun_md_push/main/SKILL.md
 
 AI 会自动获取 SKILL.md 中的指令并按步骤执行，无需提前配置任何环境。适用于 WorkBuddy、Claude Code、OpenCode、Cursor、Gemini CLI 等所有支持联网读取的智能体。
 
-### WorkBuddy
+### 也可以用命令行方式安装
+
+#### WorkBuddy
 
 ```bash
 # 用户级安装（所有项目可用）
@@ -53,7 +55,7 @@ git clone https://github.com/MuKunZiAI/mukun_md_push.git .workbuddy/skills/mukun
 
 安装后在对话中直接描述需求即可自动触发（如"把这篇md转成微信html"）。
 
-### Claude Code
+#### Claude Code
 
 ```bash
 # 用户级安装（所有项目可用）
@@ -65,11 +67,11 @@ git clone https://github.com/MuKunZiAI/mukun_md_push.git .claude/skills/mukun-md
 
 安装后通过 `/mukun-md-push-wechat` 手动触发，或由 Claude 根据描述自动加载。
 
-### OpenCode
+#### OpenCode
 
 OpenCode 支持两种安装方式：
 
-#### 方式一：Plugin 模式（推荐，支持自动更新）
+##### 方式一：Plugin 模式（推荐，支持自动更新）
 
 在 `opencode.json`（全局或项目级别）中添加插件配置：
 
@@ -81,7 +83,7 @@ OpenCode 支持两种安装方式：
 
 保存后重启 OpenCode，插件会自动安装并注册所有 skills。通过 `use skill tool to load mukun-md-push-wechat` 调用。
 
-#### 方式二：npm 手动安装
+##### 方式二：npm 手动安装
 
 适用于 OpenCode 插件管理器无法自动安装的环境（如部分 Windows 版本）：
 
@@ -97,7 +99,7 @@ npm install mukun-md-push-wechat@git+https://github.com/MuKunZiAI/mukun_md_push.
 }
 ```
 
-#### 方式三：手动 clone（传统方式）
+##### 方式三：手动 clone（传统方式）
 
 ```bash
 # 用户级安装
@@ -111,7 +113,7 @@ git clone https://github.com/MuKunZiAI/mukun_md_push.git .opencode/skills/mukun-
 
 > Plugin 模式下，插件会自动将仓库根目录注册为 skills 搜索路径，并注入 `CODEBUDDY_SKILL_DIR` 环境变量，确保 SKILL.md 中的脚本路径在 OpenCode 环境下也能正确解析。
 
-### OpenAI Codex CLI
+#### OpenAI Codex CLI/APP
 
 Codex CLI 使用 `AGENTS.md` 作为项目级指令文件，Skills 放在 `~/.codex/skills/` 目录下：
 
