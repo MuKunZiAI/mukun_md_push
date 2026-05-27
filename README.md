@@ -246,7 +246,7 @@ rm -rf /tmp/mukun_md_push
 
 **结构约定**：
 
-```markdown
+````markdown
 # 技术实践：使用 Calcite 实现 SQL 行级权限控制
 
 ## 背景
@@ -276,7 +276,8 @@ SqlNode node = parser.parseQuery();
 ```
 
 上述代码完成 SQL 的初始解析。
-```
+
+````
 
 #### 模式差异速查
 
