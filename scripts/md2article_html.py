@@ -88,8 +88,9 @@ def parse_article(md_text):
     - **粗体**
     - 表格
     - 代码块
-    - 有序列表 (1. 2. 3. ...)
-    - 无序列表 (- 或 * 或 +)
+    - 有序列表 (1. 2. 3. ...)，支持嵌套
+    - 无序列表 (- 或 * 或 +)，支持嵌套
+    - 任务列表 (- [ ] / - [x])
     返回 {"title": str, "blocks": [...]}
     """
     lines = md_text.strip().split('\n')
@@ -102,6 +103,40 @@ def parse_article(md_text):
     in_table = False
     bq_buf = []
     in_blockquote = False
+
+    # ── 列表嵌套追踪 ──
+    # list_stack: [{ "type": "ol"|"ul"|"task", "indent": int, "items": [...] }]
+    list_stack = []
+
+    def _line_indent(raw_line):
+        """返回行首空格数（缩进层级）"""
+        return len(raw_line) - len(raw_line.lstrip(' '))
+
+    def _flush_lists_to_indent(target_indent):
+        """将缩进大于 target_indent 的列表出栈，嵌套为父列表末项的 children"""
+        while list_stack and list_stack[-1]["indent"] > target_indent:
+            child = list_stack.pop()
+            if list_stack:
+                parent_items = list_stack[-1]["items"]
+                if parent_items:
+                    if parent_items[-1].get("children") is None:
+                        parent_items[-1]["children"] = []
+                    parent_items[-1]["children"].append(child)
+            else:
+                blocks.append(child)
+
+    def _flush_all_lists():
+        """将所有未关闭的列表逐级出栈并嵌套"""
+        while list_stack:
+            child = list_stack.pop()
+            if list_stack:
+                parent_items = list_stack[-1]["items"]
+                if parent_items:
+                    if parent_items[-1].get("children") is None:
+                        parent_items[-1]["children"] = []
+                    parent_items[-1]["children"].append(child)
+            else:
+                blocks.append(child)
 
     def flush_para():
         if para_buf:
@@ -132,6 +167,7 @@ def parse_article(md_text):
                 blocks.append({"type": "code_block", "text": '\n'.join(code_lines)})
                 code_lines.clear()
             else:
+                _flush_all_lists()
                 flush_para()
                 flush_table()
             in_code_block = not in_code_block
@@ -143,6 +179,7 @@ def parse_article(md_text):
 
         # H1 标题
         if stripped.startswith('# ') and not stripped.startswith('## '):
+            _flush_all_lists()
             flush_para()
             flush_table()
             if not title:
@@ -151,6 +188,7 @@ def parse_article(md_text):
 
         # 引用块
         if stripped.startswith('> '):
+            _flush_all_lists()
             flush_para()
             flush_table()
             if not in_blockquote:
@@ -166,6 +204,7 @@ def parse_article(md_text):
         # 图片（独立行）
         img_match = re.match(r'^!\[([^\]]*)\]\(([^)\n]+)\)$', stripped)
         if img_match:
+            _flush_all_lists()
             flush_para()
             flush_table()
             blocks.append({"type": "image", "alt": img_match.group(1).strip(), "src": img_match.group(2).strip()})
@@ -173,6 +212,7 @@ def parse_article(md_text):
 
         # H2 章节标题
         if stripped.startswith('## '):
+            _flush_all_lists()
             flush_para()
             flush_table()
             blocks.append({"type": "heading", "text": stripped[3:].strip(), "level": 2})
@@ -180,6 +220,7 @@ def parse_article(md_text):
 
         # H3 子标题
         if stripped.startswith('### '):
+            _flush_all_lists()
             flush_para()
             flush_table()
             blocks.append({"type": "heading", "text": stripped[4:].strip(), "level": 3})
@@ -187,12 +228,14 @@ def parse_article(md_text):
 
         # 分隔线
         if stripped in ('---', '***', '* * *'):
+            _flush_all_lists()
             flush_para()
             flush_table()
             continue
 
         # 表格行
         if stripped.startswith('|'):
+            _flush_all_lists()
             def is_separator_row(cells):
                 for c in cells:
                     s = c.strip()
@@ -213,40 +256,72 @@ def parse_article(md_text):
             flush_table()
             in_table = False
 
-        # 有序列表 (1. 2. 3. ...)
+        # ── 列表解析（支持嵌套 + 任务列表）──
+        indent = _line_indent(raw)
+
+        # 任务列表: - [ ] 或 - [x] 或 * [ ] 或 + [ ]
+        task_match = re.match(r'^[\-\*\+]\s+\[([ xX])\]\s+(.+)$', stripped)
+        if task_match:
+            flush_para()
+            flush_table()
+            checked = task_match.group(1).lower() == 'x'
+            item_text = task_match.group(2)
+
+            _flush_lists_to_indent(indent)
+
+            item_data = {"text": item_text, "checked": checked, "children": None}
+            if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "task":
+                list_stack[-1]["items"].append(item_data)
+            else:
+                list_stack.append({"type": "task", "indent": indent, "items": [item_data]})
+            continue
+
+        # 有序列表: 1. / 99. ...
         ol_match = re.match(r'^(\d+)\.\s+(.+)$', stripped)
         if ol_match:
             flush_para()
             flush_table()
             item_text = ol_match.group(2)
-            if blocks and blocks[-1]["type"] == "ol":
-                blocks[-1]["items"].append(item_text)
+
+            _flush_lists_to_indent(indent)
+
+            item_data = {"text": item_text, "children": None}
+            if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "ol":
+                list_stack[-1]["items"].append(item_data)
             else:
-                blocks.append({"type": "ol", "items": [item_text]})
+                list_stack.append({"type": "ol", "indent": indent, "items": [item_data]})
             continue
 
-        # 无序列表 (- 或 * 或 +)
+        # 无序列表: - / * / +
         ul_match = re.match(r'^[\-\*\+]\s+(.+)$', stripped)
         if ul_match:
             flush_para()
             flush_table()
             item_text = ul_match.group(1)
-            if blocks and blocks[-1]["type"] == "ul":
-                blocks[-1]["items"].append(item_text)
+
+            _flush_lists_to_indent(indent)
+
+            item_data = {"text": item_text, "children": None}
+            if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "ul":
+                list_stack[-1]["items"].append(item_data)
             else:
-                blocks.append({"type": "ul", "items": [item_text]})
+                list_stack.append({"type": "ul", "indent": indent, "items": [item_data]})
             continue
 
-        # 空行
+        # 空行 — 不关闭列表（允许列表项间有空行），只 flush 段落缓冲
         if not stripped:
             flush_para()
             continue
+
+        # 非列表内容：关闭所有未完成的列表
+        _flush_all_lists()
 
         # 普通段落
         para_buf.append(stripped)
 
     flush_para()
     flush_bq()
+    _flush_all_lists()
     if in_table:
         flush_table()
     return {"title": title, "blocks": blocks}
@@ -400,6 +475,56 @@ def render_footer(s):
     )
 
 
+def _render_list_block(block, s):
+    """递归渲染列表块（ol/ul/task），支持任意层级嵌套"""
+    list_type = block["type"]
+
+    if list_type == "ol":
+        tag = "ol"
+        list_style = 'margin:0 0 14px 0;padding-left:24px'
+    elif list_type == "task":
+        tag = "ul"
+        list_style = 'margin:0 0 14px 0;padding-left:24px;list-style:none'
+    else:
+        tag = "ul"
+        list_style = 'margin:0 0 14px 0;padding-left:24px'
+
+    items_html = []
+    for item in block["items"]:
+        item_text = item["text"]
+        formatted = format_text(escape_html(item_text), s)
+
+        # 任务列表渲染
+        if list_type == "task":
+            checked = item.get("checked", False)
+            checkbox = "☑" if checked else "☐"
+            color = "#999" if checked else "#333"
+            li_content = f'<span style="color:{color};margin-right:6px;font-size:14px">{checkbox}</span>{formatted}'
+        else:
+            li_content = formatted
+
+        # 嵌套子列表
+        children_html = ""
+        children = item.get("children")
+        if children:
+            if isinstance(children, list):
+                for child_block in children:
+                    children_html += _render_list_block(child_block, s)
+            elif isinstance(children, dict):
+                children_html = _render_list_block(children, s)
+
+        if children_html:
+            items_html.append(
+                f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}\n{children_html}</li>'
+            )
+        else:
+            items_html.append(
+                f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}</li>'
+            )
+
+    return f'<{tag} style="{list_style}">\n' + '\n'.join(items_html) + f'\n</{tag}>'
+
+
 def generate_html(data, s):
     """生成微信兼容 HTML（文章模式）"""
     content_parts = []
@@ -439,26 +564,8 @@ def generate_html(data, s):
             content_parts.append(
                 f'<p style="margin:0 0 14px 0">{formatted}</p>'
             )
-        elif btype == "ol":
-            items_html = []
-            for item_text in block["items"]:
-                formatted = format_text(escape_html(item_text), s)
-                items_html.append(f'<li style="margin:0 0 6px 0;line-height:1.9">{formatted}</li>')
-            content_parts.append(
-                '<ol style="margin:0 0 14px 0;padding-left:24px">\n'
-                + '\n'.join(items_html)
-                + '\n</ol>'
-            )
-        elif btype == "ul":
-            items_html = []
-            for item_text in block["items"]:
-                formatted = format_text(escape_html(item_text), s)
-                items_html.append(f'<li style="margin:0 0 6px 0;line-height:1.9">{formatted}</li>')
-            content_parts.append(
-                '<ul style="margin:0 0 14px 0;padding-left:24px">\n'
-                + '\n'.join(items_html)
-                + '\n</ul>'
-            )
+        elif btype in ("ol", "ul", "task"):
+            content_parts.append(_render_list_block(block, s))
 
     content = '\n'.join(content_parts)
 
