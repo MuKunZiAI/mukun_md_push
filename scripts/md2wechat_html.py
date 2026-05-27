@@ -7,11 +7,11 @@ Markdown -> 微信兼容 HTML 转换器（统一入口）
   - md2article_html.py  —— 文章模式（长文叙事，配色通过 config.yaml 控制）
 
 用法:
+  python3 md2wechat_html.py --article <input.md> [output.html]    # 文章模式（默认）
   python3 md2wechat_html.py --news <input.md> [output.html]       # 新闻模式
-  python3 md2wechat_html.py --article <input.md> [output.html]    # 文章模式
   python3 md2wechat_html.py --config /path/to/config.yaml --article <input.md> [output.html]
 
-不指定模式时默认为 --news。
+不指定模式时默认为 --article。
 """
 
 import os
@@ -23,7 +23,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def main():
     args = sys.argv[1:]
-    mode = "news"  # 默认新闻模式
+    mode = "article"  # 默认文章模式
     config_path = None
 
     i = 0
@@ -43,11 +43,11 @@ def main():
 
     if not positional:
         print("用法:")
+        print("  python3 md2wechat_html.py --article <input.md> [output.html]    # 文章模式（默认）")
         print("  python3 md2wechat_html.py --news <input.md> [output.html]       # 新闻模式")
-        print("  python3 md2wechat_html.py --article <input.md> [output.html]    # 文章模式")
         print("  python3 md2wechat_html.py --config <path> --article <input.md> [output.html]")
         print()
-        print("不指定模式时默认为 --news。")
+        print("不指定模式时默认为 --article。")
         sys.exit(1)
 
     # 构建子脚本命令

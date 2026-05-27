@@ -3,16 +3,17 @@
 新闻/文章推送脚本：Markdown → 微信兼容 HTML → 草稿箱
 
 用法:
-  # 新闻模式（默认）
+  # 文章模式（默认）
   python3 push_daily.py <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
 
-  # 文章模式
-  python3 push_daily.py --article <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
+  # 新闻模式
+  python3 push_daily.py --news <input.md> [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST] [--media-id MEDIA_ID]
 
   # 更新已有草稿（追加 --update，注意 input.md 必须在 --update 之前，否则会被误判为 media_id）
   python3 push_daily.py <input.md> --update [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
   python3 push_daily.py <input.md> --update MEDIA_ID [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
   python3 push_daily.py --article <input.md> --update [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
+  python3 push_daily.py --news <input.md> --update [--title TITLE] [--cover COVER_IMAGE] [--digest DIGEST]
 
 Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title 和 --digest 参数）：
   ---
@@ -30,7 +31,7 @@ Markdown frontmatter 支持（在文件顶部加 YAML 区段，可省去 --title
 - 1:1 裁剪坐标固定为 "1008,0,1872,864"
 
 完整工作流:
-  1. Markdown → 微信兼容 HTML (md2wechat_html.py，文章模式时加 --article 参数)
+  1. Markdown → 微信兼容 HTML (md2wechat_html.py，默认文章模式，新闻模式时加 --news 参数)
   2. 上传封面图（首次）
   3. 上传正文图片素材并替换 HTML 引用（支持缓存复用）
   4. 推送草稿箱 / 更新已有草稿（--update）
@@ -743,11 +744,14 @@ def main():
         sys.exit(1)
 
     args = sys.argv[1:]
-    article_mode = False
+    article_mode = True  # 默认文章模式
     update_mode = False
     update_media_id = None
 
     # 识别模式参数
+    if "--news" in args:
+        article_mode = False
+        args = [a for a in args if a != "--news"]
     if "--article" in args:
         article_mode = True
         args = [a for a in args if a != "--article"]

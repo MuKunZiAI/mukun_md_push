@@ -1,6 +1,6 @@
 ---
 name: mukun-md-push-wechat
-description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持新闻模式（默认）和文章模式。当用户提到"md转微信html""推送公众号""转换微信公众号格式"等意图时触发此技能。
+description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持文章模式（默认）和新闻模式。当用户提到"md转微信html""推送公众号""转换微信公众号格式"等意图时触发此技能。
 allowed-tools: Read, Bash, Write
 ---
 
@@ -21,11 +21,16 @@ allowed-tools: Read, Bash, Write
 
 **决策原则**：技能 2（推送）已包含技能 1（转换），无需同时调用两者。
 
+**默认模式**：用户未明确指定时，使用文章模式（`--article`）。仅在以下情况使用新闻模式（`--news`）：
+- 用户明确说"新闻模式""用新闻模式""--news"
+- 上文对话已在讨论新闻日报、周报等内容
+- Markdown 内容明显为板块化日报格式（含多个独立新闻板块）
+
 **模式速查**：
 | 模式 | 标志 | 独立脚本 | 适用场景 |
 |------|------|---------|---------|
-| 新闻模式 | `--news`（默认） | `md2news_html.py` | AI 周报、行业动态汇总（板块化日报） |
-| 文章模式 | `--article` | `md2article_html.py` | 技术实践、成语典故、长文叙事（配色通过 config.yaml 控制）
+| 文章模式 | `--article`（默认） | `md2article_html.py` | 技术实践、成语典故、长文叙事（配色通过 config.yaml 控制）|
+| 新闻模式 | `--news` | `md2news_html.py` | AI 周报、行业动态汇总（板块化日报，需用户明确指定）|
 
 ### 文章模式预设样式
 
@@ -60,16 +65,16 @@ python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py <input.md> [output.html
 ```
 
 两种转换模式：
-- **新闻模式（默认）**：一条消息对应一条新闻，分板块展示，报纸风格配色
-- **文章模式（`--article`）**：长文叙事渲染，默认白底灰字 + 棕色标签标题，可通过 config.yaml 配置为泛黄报纸风格或任意自定义配色
+- **文章模式（默认）**：长文叙事渲染，默认白底灰字 + 棕色标签标题，可通过 config.yaml 配置为泛黄报纸风格或任意自定义配色
+- **新闻模式（`--news`）**：一条消息对应一条新闻，分板块展示，报纸风格配色（需用户明确指定）
 
 示例：
 ```bash
-# 新闻模式（默认）
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py article.md article_wechat.html
+# 文章模式（默认）
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py story.md story_wechat.html
 
-# 文章模式
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --article story.md story_wechat.html
+# 新闻模式（明确指定）
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --news article.md article_wechat.html
 
 # 指定配置文件
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --config /path/to/config.yaml --article story.md
@@ -87,13 +92,16 @@ python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2article_html.py --config /path/to/conf
 
 调用脚本：
 ```bash
+# 文章模式（默认）
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
+# 新闻模式（明确指定）
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --news <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
 
 # 更新已有草稿（追加 --update，注意 input.md 必须在 --update 之前，否则会被误判为 media_id）
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> --update MEDIA_ID [--title TITLE] [--cover COVER] [--digest DIGEST]
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --news <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
 ```
 
 支持 Markdown frontmatter 提取标题和摘要：
