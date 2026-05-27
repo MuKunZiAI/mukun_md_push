@@ -16,7 +16,7 @@
 
 ## ✨ 功能特性
 
-- 📰 **两种转换模式**：新闻模式（默认，板块化日报）和文章模式（长文叙事，配色可配置）
+- 📰 **两种转换模式**：文章模式（默认，长文叙事，配色可配置）和新闻模式（板块化日报，需明确指定 `--news`）
 - 🎨 **微信样式兼容**：所有 CSS 内联，使用 `<section>` 替代 `<div>`，规避微信渲染限制
 - 📤 **草稿箱推送**：转换后直接上传到微信公众号草稿箱，手动修改原创等信息后，即可发布
 - 🖼️ **图片自动上传**：自动解析 Markdown 中的本地图片引用，上传到微信永久素材库并替换为 CDN URL
@@ -369,8 +369,8 @@ SqlNode node = parser.parseQuery();
 
 ```bash
 # 直接用 --config 引用预设
-python3 scripts/md2wechat_html.py --config references/article_nostalgic.yaml --article story.md
-python3 scripts/push_daily.py --config references/article_modern.yaml --article story.md
+python3 scripts/md2wechat_html.py --config references/article_nostalgic.yaml story.md
+python3 scripts/push_daily.py --config references/article_modern.yaml story.md
 ```
 
 #### 🔧 如何新增自定义配置
@@ -403,10 +403,10 @@ style:
 
 ```bash
 # 转换 HTML
-python3 scripts/md2wechat_html.py --config /path/to/my_style.yaml --article my_article.md
+python3 scripts/md2wechat_html.py --config /path/to/my_style.yaml my_article.md
 
 # 转换 + 推送
-python3 scripts/push_daily.py --config /path/to/my_style.yaml --article my_article.md --digest "..."
+python3 scripts/push_daily.py --config /path/to/my_style.yaml my_article.md --digest "..."
 ```
 
 **最简自定义示例**（只覆盖你想改的字段，其余用代码默认值）：
@@ -430,14 +430,14 @@ style:
 ### 仅转换 HTML
 
 ```bash
-# 新闻模式（默认）
-python3 scripts/md2wechat_html.py article.md
+# 文章模式（默认）
+python3 scripts/md2wechat_html.py story.md
 
-# 文章模式
-python3 scripts/md2wechat_html.py --article story.md
+# 新闻模式
+python3 scripts/md2wechat_html.py --news article.md
 
 # 使用自定义配色配置
-python3 scripts/md2wechat_html.py --config /path/to/my_theme.yaml --article article.md
+python3 scripts/md2wechat_html.py --config /path/to/my_theme.yaml story.md
 
 # 或直接调用独立脚本
 python3 scripts/md2news_html.py article.md
@@ -479,14 +479,14 @@ image_cache:
 > **关键优势**：同一张图片无论放在哪个目录、叫什么文件名，只要文件内容相同，MD5 hash 就相同，永远不会被重复上传。彻底避免多次推送时图片重复上传导致微信公众号永久素材库被打爆的问题。
 
 ```bash
-# 新闻模式推送
-python3 scripts/push_daily.py article.md
+# 文章模式推送（默认）
+python3 scripts/push_daily.py story.md
 
-# 文章模式推送
-python3 scripts/push_daily.py --article story.md
+# 新闻模式推送
+python3 scripts/push_daily.py --news article.md
 
 # 自定义标题、封面图、摘要
-python3 scripts/push_daily.py article.md --title "自定义标题" --cover ./封面图.png --digest "自定义摘要"
+python3 scripts/push_daily.py story.md --title "自定义标题" --cover ./封面图.png --digest "自定义摘要"
 ```
 
 ## 📁 目录结构
@@ -526,6 +526,12 @@ mukun_md_push/
 ```
 
 ## 📋 修改说明
+
+### 2026-05-27
+
+- **默认模式切换**：从新闻模式（`--news`）改为文章模式（`--article`）作为默认。`md2wechat_html.py` 中 `mode = "article"`，`push_daily.py` 中 `article_mode = True`，新增 `--news` 参数用于显式指定新闻模式。SKILL.md 中新增默认模式决策规则：仅当用户明确说"新闻模式"或上文在讨论新闻日报时才使用 `--news`
+- **文章模式新增列表解析**：`md2article_html.py` 的 `parse_article()` 新增有序列表（`1. 2. 3. ...` 正则 `^(\d+)\.\s+(.+)$`）和无序列表（`- * +` 正则 `^[\-\*\+]\s+(.+)$`）的检测与解析，连续同类型列表项自动合并为一个 block。`generate_html()` 新增 `<ol>` 和 `<ul>` 渲染分支，列表项支持内联粗体、代码等格式
+- **代码块横向滚动修复**：`render_code_block()` 中行分隔从 `<br>` 改为 `\n`，使 `white-space: pre` 正确生效；CSS 新增 `word-break: normal`、`overflow-wrap: normal`、`-webkit-overflow-scrolling: touch` 防御属性，确保长行代码不换行、出现横向滚动条
 
 ### 2026-05-26
 
