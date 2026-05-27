@@ -525,6 +525,11 @@ mukun_md_push/
 └── README.md
 ```
 
+## 扫码关注公众号“木昆子记录AI”
+专注分享AI落地工程化经验和AI产品及工具使用心得
+<img width="258" height="258" alt="qrcode_for_gh_898a6a7bae30_258" src="https://github.com/user-attachments/assets/de2382e2-ca65-4294-aa64-16b61bbdc5a5" />
+
+
 ## 📋 修改说明
 
 ### 2026-05-27
