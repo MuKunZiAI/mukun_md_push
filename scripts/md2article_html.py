@@ -112,6 +112,19 @@ def parse_article(md_text):
         """返回行首空格数（缩进层级）"""
         return len(raw_line) - len(raw_line.lstrip(' '))
 
+    def _close_sibling_lists(indent):
+        """关闭同缩进或更深的旧列表，确保不同类型列表为兄弟节点"""
+        while list_stack and list_stack[-1]["indent"] >= indent:
+            child = list_stack.pop()
+            if list_stack:
+                parent_items = list_stack[-1]["items"]
+                if parent_items:
+                    if parent_items[-1].get("children") is None:
+                        parent_items[-1]["children"] = []
+                    parent_items[-1]["children"].append(child)
+            else:
+                blocks.append(child)
+
     def _flush_lists_to_indent(target_indent):
         """将缩进大于 target_indent 的列表出栈，嵌套为父列表末项的 children"""
         while list_stack and list_stack[-1]["indent"] > target_indent:
@@ -273,6 +286,7 @@ def parse_article(md_text):
             if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "task":
                 list_stack[-1]["items"].append(item_data)
             else:
+                _close_sibling_lists(indent)
                 list_stack.append({"type": "task", "indent": indent, "items": [item_data]})
             continue
 
@@ -289,6 +303,7 @@ def parse_article(md_text):
             if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "ol":
                 list_stack[-1]["items"].append(item_data)
             else:
+                _close_sibling_lists(indent)
                 list_stack.append({"type": "ol", "indent": indent, "items": [item_data]})
             continue
 
@@ -305,6 +320,7 @@ def parse_article(md_text):
             if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "ul":
                 list_stack[-1]["items"].append(item_data)
             else:
+                _close_sibling_lists(indent)
                 list_stack.append({"type": "ul", "indent": indent, "items": [item_data]})
             continue
 
