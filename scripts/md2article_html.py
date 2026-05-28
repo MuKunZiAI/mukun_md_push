@@ -15,6 +15,10 @@ import re
 import sys
 import os
 
+from pygments import lex
+from pygments.lexers import get_lexer_by_name
+from pygments.token import Token
+
 # ─── 配置路径 ──────────────────────────────────────────
 CONFIG_PATH = os.path.join(os.path.expanduser("~/.md_push_wechat"), "config.yaml")
 
@@ -177,12 +181,15 @@ def parse_article(md_text):
         # 代码块
         if stripped.startswith('```'):
             if in_code_block:
-                blocks.append({"type": "code_block", "text": '\n'.join(code_lines)})
+                blocks.append({"type": "code_block", "text": '\n'.join(code_lines),
+                               "lang": code_lang})
                 code_lines.clear()
             else:
                 _flush_all_lists()
                 flush_para()
                 flush_table()
+                # 提取语言标识，如 ```python → "python"
+                code_lang = stripped[3:].strip().lower() or None
             in_code_block = not in_code_block
             continue
 
@@ -438,48 +445,111 @@ def render_blockquote(text, s):
     return html
 
 
-def render_code_block(code):
-    """渲染代码块，长行支持横向滚动不换行。
+def _token_to_css_class(ttype):
+    """将 Pygments token 类型映射到微信 code-snippet CSS class。"""
+    # 注释
+    if ttype in Token.Comment:
+        return "code-snippet__comment"
+    # 关键字
+    if ttype in Token.Keyword:
+        return "code-snippet__keyword"
+    # 函数名、类名
+    if ttype in Token.Name.Function or ttype in Token.Name.Class:
+        return "code-snippet__title"
+    # 字符串
+    if ttype in Token.String:
+        return "code-snippet__string"
+    # f-string 插值 {var}
+    if ttype in Token.String.Interpol:
+        return "code-snippet__subst"
+    # 数字
+    if ttype in Token.Number:
+        return "code-snippet__number"
+    # 内置函数/类型
+    if ttype in Token.Name.Builtin:
+        return "code-snippet__built_in"
+    # 普通文本、标点、空白等 — 不高亮
+    return None
 
-    微信编辑器编辑模式兼容性：
-    - 每行独立 code[display:block;white-space:nowrap]，换行由块级结构保证
-    - nowrap 保证编辑模式可滚动，但会折叠空白 → 将前导空格/制表符转为 &nbsp;
-    - 预览模式：section[overflow:auto] 提供横向滚动
+
+def highlight_code(code, lang=None):
+    """用 Pygments 对代码做词法分析，返回按行分组的 token 列表。
+
+    每行: [(text_str, css_class_or_None), ...]
+    """
+    if not code:
+        return []
+
+    # 获取 lexer：有指定语言则直接用，否则回退为纯文本（不猜测，避免误判）
+    try:
+        if lang:
+            lexer = get_lexer_by_name(lang, stripall=True)
+        else:
+            lexer = get_lexer_by_name("text", stripall=True)
+    except Exception:
+        lexer = get_lexer_by_name("text", stripall=True)
+
+    lines = []
+    current_line = []
+
+    for ttype, value in lex(code, lexer):
+        css_class = _token_to_css_class(ttype)
+        # 按换行切分 token
+        parts = value.split('\n')
+        for i, part in enumerate(parts):
+            if i > 0:
+                # 换行 — 结束当前行
+                lines.append(current_line)
+                current_line = []
+            if part:
+                current_line.append((part, css_class))
+
+    if current_line:
+        lines.append(current_line)
+
+    return lines
+
+
+def render_code_block(code, lang=None):
+    """渲染微信 code-snippet 代码块（语法高亮 + 行号）。
+
+    使用微信内置 code-snippet 组件：section > ul(行号) + pre > code×N(每行)。
+    CSS 由微信平台 code-snippet class 白名单提供，无需 inline style。
     """
     if not code:
         return ""
 
-    escaped = escape_html(code)
-    # 保留行内 <code> 标签（如反引号内的 HTML 标签）
-    escaped = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', escaped)
+    lines_tokens = highlight_code(code, lang)
 
-    code_style = (
-        "display:block;font-family:Menlo,Monaco,'Courier New',monospace;"
-        "font-size:13px;color:#24292e;line-height:1.6;"
-        "white-space:nowrap;word-break:normal;overflow-wrap:normal"
+    # 行号列表
+    line_nums_html = ''.join('<li></li>' for _ in lines_tokens)
+
+    # 逐行渲染
+    code_lines_html = []
+    for line_tokens in lines_tokens:
+        if not line_tokens:
+            # 空行 — 零宽占位符
+            code_lines_html.append('<code><span leaf="">&#8203;</span></code>')
+        else:
+            parts = []
+            for text, css_class in line_tokens:
+                escaped = escape_html(text)
+                if css_class:
+                    parts.append(f'<span class="{css_class}">{escaped}</span>')
+                else:
+                    parts.append(escaped)
+            line_html = ''.join(parts)
+            code_lines_html.append(f'<code><span leaf="">{line_html}</span></code>')
+
+    lang_attr = f' data-lang="{escape_html(lang)}"' if lang else ''
+
+    return (
+        f'<section class="code-snippet__fix code-snippet__js">\n'
+        f'<ul class="code-snippet__line-index code-snippet__js">{line_nums_html}</ul>\n'
+        f'<pre class="code-snippet__js"{lang_attr}>\n'
+        + '\n'.join(code_lines_html) +
+        f'\n</pre>\n</section>'
     )
-
-    def _preserve_indent(line):
-        """将行首空白字符转为 &nbsp;，避免 nowrap 折叠缩进。"""
-        stripped = line.lstrip()
-        if stripped == line:
-            return line  # 无缩进，原样返回
-        indent_len = len(line) - len(stripped)
-        indent_chars = line[:indent_len]
-        # 空格 → &nbsp;，制表符 → 4×&nbsp;
-        preserved = indent_chars.replace('\t', '&nbsp;' * 4).replace(' ', '&nbsp;')
-        return preserved + stripped
-
-    lines = escaped.split('\n')
-    lines_html = '\n'.join(
-        f'<code style="{code_style}">{_preserve_indent(line) if line else "&#8203;"}</code>'
-        for line in lines
-    )
-
-    html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow:auto;-webkit-overflow-scrolling:touch">
-{lines_html}
-</section>'''
-    return html
 
 
 def render_ending(s):
@@ -589,7 +659,7 @@ def generate_html(data, s):
         elif btype == "blockquote":
             content_parts.append(render_blockquote(text, s))
         elif btype == "code_block":
-            content_parts.append(render_code_block(text))
+            content_parts.append(render_code_block(text, block.get("lang")))
         elif btype == "table":
             content_parts.append(render_table(block["rows"], s))
         elif btype == "image":
