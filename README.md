@@ -537,6 +537,7 @@ mukun_md_push/
 
 ### 2026-05-28
 
+- **代码块编辑模式支持行号、高亮**：将代码区域的样式改为微信编辑器的代码块样式，微信文章会自行渲染
 - **代码块编辑模式兼容性全面修复**：微信编辑器编辑模式会 normalize 空白字符并 strip CSS 属性，导致代码块的换行、横向滚动、缩进三项全部失效。修复方案分三层：
   - **换行**：不再依赖 `\n`（会被 normalize），每行独立 `<code style="display:block">` 块级元素，换行由 DOM 结构天然保证
   - **横向滚动**：`section[overflow:auto]` 提供滚动容器，`code[white-space:nowrap]` 阻止长行折行（编辑模式下 `white-space:pre` 会被 strip，`nowrap` 不受影响）
