@@ -439,18 +439,20 @@ def render_blockquote(text, s):
 
 
 def render_code_block(code):
-    """渲染代码块，长行支持横向滚动不换行"""
+    """渲染代码块，长行支持横向滚动不换行。
+
+    微信编辑器编辑模式会 normalize 空白字符导致 \\n 丢失，
+    因此将换行替换为 <br> 标签确保编辑模式换行不丢失。
+    white-space:pre 用于保留缩进空格/制表符，防止长行折行。
+    """
     if not code:
         return ""
 
     escaped = escape_html(code)
-    lines = escaped.split('\n')
-    html_lines = []
-    for line in lines:
-        line = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', line)
-        html_lines.append(line)
-
-    code_html = '\n'.join(html_lines)
+    # 保留行内 <code> 标签（如反引号内的 HTML 标签）
+    escaped = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', escaped)
+    # 关键：\\n → <br>，微信编辑器不会吞掉 HTML 标签
+    code_html = escaped.replace('\n', '<br>')
 
     html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
   <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre;word-break:normal;overflow-wrap:normal">{code_html}</code>
