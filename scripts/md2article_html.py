@@ -60,6 +60,13 @@ def _build_article_html(s, title, content, footer_section="", ending_section="")
     text_color = s.get("text", s.get("dark", "rgb(85,85,85)"))
     rule = s.get("rule", "#c4a882")
 
+    # 如果 markdown 没有 # 一级标题，去掉空白封面区
+    if not title:
+        t = re.sub(
+            r'<!-- 封面 -->.*?</section>\s*\n',
+            '', t, flags=re.DOTALL
+        )
+
     for name, val in [
         ("BG", s["bg"]),
         ("HERO_BG", s.get("hero_bg", s["accent"])),
