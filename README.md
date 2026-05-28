@@ -535,6 +535,15 @@ mukun_md_push/
 
 ## 📋 修改说明
 
+### 2026-05-28
+
+- **代码块编辑模式兼容性全面修复**：微信编辑器编辑模式会 normalize 空白字符并 strip CSS 属性，导致代码块的换行、横向滚动、缩进三项全部失效。修复方案分三层：
+  - **换行**：不再依赖 `\n`（会被 normalize），每行独立 `<code style="display:block">` 块级元素，换行由 DOM 结构天然保证
+  - **横向滚动**：`section[overflow:auto]` 提供滚动容器，`code[white-space:nowrap]` 阻止长行折行（编辑模式下 `white-space:pre` 会被 strip，`nowrap` 不受影响）
+  - **缩进**：`white-space:nowrap` 会折叠行首空白 → 将前导空格转为 `&nbsp;`、制表符转为 4×`&nbsp;`（HTML 实体不被微信编辑器折叠），既保留缩进视觉效果又不影响滚动
+- **列表编辑模式多余空行修复**：`_render_list_block()` 生成的 HTML 中 `<li>` 元素间包含 `\n`，微信编辑器将其解释为新的空列表项，产生带项目符号的多余空行。改为紧凑拼接（`''.join(items_html)`），去除所有元素间换行
+- **文章模式列表解析增强**：`parse_article()` 引入 `list_stack` 缩进追踪，支持嵌套列表（无限层级）、任务列表（`- [ ]`/`- [x]`）、混合标记符（`-`/`*`/`+`）；`generate_html()` 新增 `_render_list_block()` 递归渲染；修复不同类型兄弟列表（ol/ul/task）的错误嵌套
+
 ### 2026-05-27
 
 - **默认模式切换**：从新闻模式（`--news`）改为文章模式（`--article`）作为默认。`md2wechat_html.py` 中 `mode = "article"`，`push_daily.py` 中 `article_mode = True`，新增 `--news` 参数用于显式指定新闻模式。SKILL.md 中新增默认模式决策规则：仅当用户明确说"新闻模式"或上文在讨论新闻日报时才使用 `--news`

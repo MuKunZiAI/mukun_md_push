@@ -441,9 +441,10 @@ def render_blockquote(text, s):
 def render_code_block(code):
     """渲染代码块，长行支持横向滚动不换行。
 
-    微信编辑器编辑模式会 normalize 空白字符导致 \\n 丢失，
-    因此将换行替换为 <br> 标签确保编辑模式换行不丢失。
-    white-space:pre 用于保留缩进空格/制表符，防止长行折行。
+    微信编辑器编辑模式兼容性：
+    - 每行独立 code[display:block;white-space:nowrap]，换行由块级结构保证
+    - nowrap 保证编辑模式可滚动，但会折叠空白 → 将前导空格/制表符转为 &nbsp;
+    - 预览模式：section[overflow:auto] 提供横向滚动
     """
     if not code:
         return ""
@@ -451,11 +452,32 @@ def render_code_block(code):
     escaped = escape_html(code)
     # 保留行内 <code> 标签（如反引号内的 HTML 标签）
     escaped = re.sub(r'&lt;code&gt;([^&]+)&lt;/code&gt;', r'<code>\1</code>', escaped)
-    # 关键：\\n → <br>，微信编辑器不会吞掉 HTML 标签
-    code_html = escaped.replace('\n', '<br>')
 
-    html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
-  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre;word-break:normal;overflow-wrap:normal">{code_html}</code>
+    code_style = (
+        "display:block;font-family:Menlo,Monaco,'Courier New',monospace;"
+        "font-size:13px;color:#24292e;line-height:1.6;"
+        "white-space:nowrap;word-break:normal;overflow-wrap:normal"
+    )
+
+    def _preserve_indent(line):
+        """将行首空白字符转为 &nbsp;，避免 nowrap 折叠缩进。"""
+        stripped = line.lstrip()
+        if stripped == line:
+            return line  # 无缩进，原样返回
+        indent_len = len(line) - len(stripped)
+        indent_chars = line[:indent_len]
+        # 空格 → &nbsp;，制表符 → 4×&nbsp;
+        preserved = indent_chars.replace('\t', '&nbsp;' * 4).replace(' ', '&nbsp;')
+        return preserved + stripped
+
+    lines = escaped.split('\n')
+    lines_html = '\n'.join(
+        f'<code style="{code_style}">{_preserve_indent(line) if line else "&#8203;"}</code>'
+        for line in lines
+    )
+
+    html = f'''<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow:auto;-webkit-overflow-scrolling:touch">
+{lines_html}
 </section>'''
     return html
 
@@ -533,14 +555,15 @@ def _render_list_block(block, s):
 
         if children_html:
             items_html.append(
-                f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}\n{children_html}</li>'
+                f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}{children_html}</li>'
             )
         else:
             items_html.append(
                 f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}</li>'
             )
 
-    return f'<{tag} style="{list_style}">\n' + '\n'.join(items_html) + f'\n</{tag}>'
+    # 去除 \\n：微信编辑器会把 HTML 元素间的换行解释为新列表项，产生多余带点空行
+    return f'<{tag} style="{list_style}">' + ''.join(items_html) + f'</{tag}>'
 
 
 def generate_html(data, s):
