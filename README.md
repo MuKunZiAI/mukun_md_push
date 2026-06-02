@@ -3,6 +3,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.6+-green.svg" alt="Python 3.6+" /></a>
   <img src="https://img.shields.io/badge/WeChat-公众号推送-07C160?logo=wechat&logoColor=white" alt="WeChat" />
+  <img src="https://img.shields.io/badge/掘金-草稿推送-1E80FF?logo=juejin&logoColor=white" alt="掘金" />
   <br/>
   <img src="https://img.shields.io/badge/WorkBuddy-支持-FF6B35?style=flat-square" alt="WorkBuddy" />
   <img src="https://img.shields.io/badge/Claude_Code-支持-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude Code" />
@@ -12,13 +13,14 @@
 </p>
 <br/>
 
-> 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可一键推送到公众号草稿箱。
+> 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可一键推送到公众号草稿箱。支持推送到稀土掘金草稿箱（图片自动上传 + MD5 缓存）。
 
 ## ✨ 功能特性
 
 - 📰 **两种转换模式**：文章模式（默认，长文叙事，配色可配置）和新闻模式（板块化日报，需明确指定 `--news`）
 - 🎨 **微信样式兼容**：所有 CSS 内联，使用 `<section>` 替代 `<div>`，规避微信渲染限制
 - 📤 **草稿箱推送**：转换后直接上传到微信公众号草稿箱，手动修改原创等信息后，即可发布
+- 🪶 **掘金草稿箱推送**：Markdown 原文直接推送掘金，自动上传本地图片到掘金 CDN（ImageX 5 步流程 + AWS SigV4 签名），基于 MD5 缓存复用已上传图片
 - 🖼️ **图片自动上传**：自动解析 Markdown 中的本地图片引用，上传到微信永久素材库并替换为 CDN URL
 - 💾 **素材智能缓存**：图片 + 封面图基于文件内容 MD5 缓存到 config.yaml，同一张图片不会重复上传
 - 📝 **Frontmatter 支持**：可在 Markdown 文件顶部声明标题和摘要
@@ -489,6 +491,60 @@ python3 scripts/push_daily.py --news article.md
 python3 scripts/push_daily.py story.md --title "自定义标题" --cover ./封面图.png --digest "自定义摘要"
 ```
 
+### 推送草稿箱（稀土掘金）
+
+推送前需在 `~/.md_push_wechat/config.yaml` 中配置掘金 Cookie：
+
+```yaml
+juejin:
+  cookie: "your_juejin_cookie"           # 必填，登录 juejin.cn → F12 → Cookies
+  category_id: "6809637773935378440"     # 可选默认分类
+  tag_ids: "7467857238494019610"         # 可选默认标签
+```
+
+#### 图片上传到掘金 CDN
+
+推送时自动扫描 Markdown 中的本地图片引用，通过掘金 ImageX 服务上传。完整 5 步流程：
+
+| 步骤 | 接口 | 说明 |
+|------|------|------|
+| 1. gen_token | `GET /imagex/v2/gen_token` | 获取 STS 临时凭证（AccessKeyId/SecretAccessKey/SessionToken） |
+| 2. ApplyImageUpload | `GET imagex.bytedanceapi.com/?Action=ApplyImageUpload` | 获取上传地址，需要 AWS SigV4 签名 |
+| 3. 上传二进制 | `POST tos-d-x-lf.douyin.com/{store_uri}` | 上传文件，带 Content-CRC32 校验 |
+| 4. CommitImageUpload | `POST ?Action=CommitImageUpload&SessionKey=xxx` | 确认上传，SigV4 签名 |
+| 5. get_img_url | `GET /imagex/v2/get_img_url` | 获取 CDN URL（`https://p1-juejin.byteimg.com/...`） |
+
+图片基于文件内容 MD5 缓存到 `config.yaml` 的 `image_cache.juejin` 段，同一张图永久复用：
+
+```yaml
+image_cache:
+  juejin:
+    <file_hash>: "<CDN URL>"
+```
+
+```bash
+# 新建草稿
+python3 scripts/push_juejin.py story.md --title "文章标题" --digest "50-100字摘要"
+
+# 更新已有草稿
+python3 scripts/push_juejin.py story.md --update DRAFT_ID
+
+# 查询可用标签
+python3 scripts/push_juejin.py --query-tags "AI"
+
+# 指定分类和标签
+python3 scripts/push_juejin.py story.md --title "标题" --digest "摘要" \
+  --category "后端" --tags "6809640445233070098,6809640408797167623"
+```
+
+掘金分类 ID 速查：
+
+| 分类 | ID | 分类 | ID |
+|------|----|------|----|
+| 后端 | `6809637769959178254` | 前端 | `6809637767543259144` |
+| AI | `6809637773935378440` | 开发工具 | `6809637771511070734` |
+| Android | `6809635626879549454` | iOS | `6809635626661445640` |
+
 ## 📁 目录结构
 
 ```
@@ -502,7 +558,8 @@ mukun_md_push/
 │   ├── md2wechat_html.py       # 统一入口（模式路由 + 参数解析）
 │   ├── md2news_html.py          # 新闻模式转换器
 │   ├── md2article_html.py       # 文章模式转换器
-│   └── push_daily.py            # 转换 + 推送草稿箱脚本
+│   ├── push_daily.py            # 微信公众号：转换 + 推送草稿箱
+│   └── push_juejin.py           # 稀土掘金：MD → 草稿箱（含图片上传）
 ├── references/                  # 文章模式预设样式（自然语言 → 配置文件）
 │   ├── article_default.yaml     # 默认样式（白底灰字）
 │   ├── article_nostalgic.yaml   # 泛黄怀旧样式（古卷暖棕）
@@ -534,6 +591,17 @@ mukun_md_push/
 
 
 ## 📋 修改说明
+
+### 2026-05-30
+
+- **掘金图片上传完整重写**：从 HAR 文件逆向掘金编辑器图片粘贴行为，完整还原 ImageX 5 步上传流程（gen_token → ApplyImageUpload → 上传二进制 → CommitImageUpload → get_img_url）
+- **AWS SigV4 签名实现**：新增 `_sigv4_auth` / `_sigv4_sign` 签名函数，修复 ImageX API 的 `InvalidAuthorization` 错误。参数排序使用 `sorted()` 确保 AWS 要求的字母顺序，避免 `urllib.parse.urlencode(dict)` 顺序不稳定的问题
+- **ServiceId 修正**：从 `k3u1fbpfcp` 改为 `73owjymdk6`（HAR 逆向确认的正确服务 ID）
+- **图片 MD5 缓存（掘金）**：参照微信图片缓存模式，新增 `image_cache.juejin` 段。基于文件内容 MD5 缓存 CDN URL，同一张图永久复用，避免重复上传
+- **mark_content 图片引用修复**：上传后替换为完整 CDN URL（`https://p1-juejin.byteimg.com/...`）而非 store_uri，确保草稿中图片正常显示
+- **gen_token 接口升级**：API 版本从 v1 升级为 v2，新增 `aid`/`uuid`/`client` 参数，Cookie 必传
+- **草稿 API 字段补全**：新增 `is_gfw`、`is_english`、`is_original`、`pics` 字段，匹配掘金编辑器实际请求格式
+- **文档更新**：README 新增掘金推送章节（ImageX 上传流程、缓存机制、分类速查、使用示例），目录结构加入 `push_juejin.py`
 
 ### 2026-05-28
 
