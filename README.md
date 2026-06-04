@@ -143,11 +143,11 @@ rm -rf /tmp/mukun_md_push
   <img src="assets/news.png" alt="新闻模式" width="480" />
 </p>
 
-### 文章模式（默认风格）
+### 文章模式（默认）
 
 > "把这篇文章转成微信公众号 HTML"
 
-白底灰字，适合技术实践与深度文章：
+白底灰字 + 棕橘胶囊标题，适合技术实践与深度文章：
 
 <p align="center">
   <img src="assets/article_default.png" alt="文章模式-默认" width="480" />
@@ -157,7 +157,7 @@ rm -rf /tmp/mukun_md_push
 
 > "用泛黄怀旧风格把这篇文章转成微信公众号 HTML"
 
-古卷泛黄底色 + 古铜暖棕强调色，适合历史文化类叙事长文：
+古卷泛黄底色 + 深棕胶囊标题，适合历史文化类叙事长文：
 
 <p align="center">
   <img src="assets/article_nostalgic.png" alt="文章模式-泛黄怀旧" width="480" />
@@ -167,13 +167,43 @@ rm -rf /tmp/mukun_md_push
 
 > "用科技蓝紫风格把这篇文章转成微信公众号 HTML"
 
-深邃灰蓝背景 + 蓝紫渐变强调色，适合 AI 科技、技术前沿文章：
+白底 + 蓝紫胶囊标题 + 深蓝封面，适合 AI 科技、技术前沿文章：
 
 <p align="center">
   <img src="assets/article_modern.png" alt="文章模式-科技蓝紫" width="480" />
 </p>
 
-> 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，自定义配色配置文件参见 [examples/config_example.yaml](examples/config_example.yaml)。
+### 文章模式（青绿引号）
+
+> "用青绿引号风格把这篇文章转成微信公众号 HTML"
+
+米白底 + 大 Q 引号包裹标题 + 青绿下划线，适合文艺随笔、杂志专栏：
+
+<p align="center">
+  <img src="assets/article_journal.png" alt="文章模式-青绿引号" width="480" />
+</p>
+
+### 文章模式（角标绿条）
+
+> "用角标绿条风格把这篇文章转成微信公众号 HTML"
+
+白底 + 黄色编号角标 + 绿色标签块标题，适合清单拆解、运营资讯：
+
+<p align="center">
+  <img src="assets/article_growth.png" alt="文章模式-角标绿条" width="480" />
+</p>
+
+### 文章模式（中轴蓝卡）
+
+> "用中轴蓝卡风格把这篇文章转成微信公众号 HTML"
+
+冷灰底 + 中轴蓝色编号卡标题 + 两侧横线，适合产品文档、技术手册：
+
+<p align="center">
+  <img src="assets/article_blueprint.png" alt="文章模式-中轴蓝卡" width="480" />
+</p>
+
+> 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，6 种预设配色配置文件参见 [references/](references/) 目录。
 
 ### 📝 支持的 Markdown 格式
 
@@ -514,24 +544,33 @@ mukun_md_push/
 │   ├── md2news_html.py          # 新闻模式转换器
 │   ├── md2article_html.py       # 文章模式转换器
 │   └── push_daily.py            # 转换 + 推送草稿箱脚本
-├── references/                  # 文章模式预设样式（自然语言 → 配置文件）
-│   ├── article_default.yaml     # 默认样式（白底灰字）
-│   ├── article_nostalgic.yaml   # 泛黄怀旧样式（古卷暖棕）
-│   └── article_modern.yaml      # 科技蓝紫样式（冷色调）
+├── references/                  # 文章模式 6 种预设样式（自然语言 → 配置文件）
+│   ├── article_default.yaml     # 默认（白底灰字 + 棕橘胶囊标题）
+│   ├── article_nostalgic.yaml   # 泛黄怀旧（古卷泛黄 + 深棕胶囊标题）
+│   ├── article_modern.yaml      # 科技蓝紫（白底 + 蓝紫胶囊标题）
+│   ├── article_journal.yaml     # 青绿引号（米白底 + 大 Q 引号线标题）
+│   ├── article_growth.yaml      # 角标绿条（白底 + 黄角标 + 绿标签块）
+│   └── article_blueprint.yaml   # 中轴蓝卡（冷灰底 + 中轴蓝色编号卡）
 ├── examples/
 │   ├── config_example.yaml              # 完整配置示例（news + article 所有可配置项）
 │   ├── default/                         # 默认配色示例（源文件 + 生成 HTML）
 │   │   ├── news_example.md                   # 新闻模式源文件
 │   │   ├── news_example.html                 # 新闻模式 HTML（生成，默认报纸配色）
 │   │   ├── article_example.md                # 文章模式源文件（AI 技术实践）
-│   │   ├── article_example.html              # 文章模式 HTML（生成，默认 AI 风格配色）
-│   ├── nostalgic/                     # 泛黄怀旧配色方案（自含源文件+配置+HTML）
+│   │   ├── article_example.html              # 文章模式 HTML（生成，默认配色）
+│   ├── nostalgic/                     # 泛黄怀旧配色方案
 │   │   ├── config_nostalgic.yaml
 │   │   ├── article_nostalgic_example.md      # 文章模式源文件（成语典故）
 │   │   └── article_nostalgic_example.html    # 文章模式 HTML（生成，怀旧配色）
-│   └── modern/                        # 现代化蓝紫配色方案
-│       ├── config_modern.yaml
-│       └── article_modern_example.html       # 文章模式 HTML（生成，使用 default/article_example.md 源文件）
+│   ├── modern/                        # 科技蓝紫配色方案
+│   │   ├── config_modern.yaml
+│   │   └── article_modern_example.html       # 文章模式 HTML（生成，蓝紫配色）
+│   ├── journal/                       # 青绿引号配色方案
+│   │   └── article_journal_example.html      # 文章模式 HTML（生成，青绿配色）
+│   ├── growth/                        # 角标绿条配色方案
+│   │   └── article_growth_example.html       # 文章模式 HTML（生成，角标配色）
+│   └── blueprint/                     # 中轴蓝卡配色方案
+│       └── article_blueprint_example.html    # 文章模式 HTML（生成，蓝卡配色）
 ├── LICENSE
 └── README.md
 ```
@@ -564,6 +603,7 @@ mukun_md_push/
   - 每类新增底色系触发词（白底/黄底/暖黄/灰底/冷灰/蓝灰底），提升匹配精准度
 - **SKILL.md、README.md 预设表格和匹配规则同步更新**：预设数量从"3 种"修正为"6 种"，新增 `references/article_journal.yaml` 的命令示例
 - **6 个 YAML 配置文件注释更新**：注释中的样式名称、视觉描述、适用场景、触发词全部同步为最新版本
+- **示例 HTML 全部重新生成**：`examples/` 下 4 个原有示例 HTML（default 文章/新闻、modern、nostalgic）用最新脚本和配置重新生成，确保截图与实际效果一致
 
 ### 2026-05-28
 

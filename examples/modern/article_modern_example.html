@@ -12,13 +12,13 @@
 </section>
 
 <!-- 正文区域 -->
-<section style="font-size:16px;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px;color:#2d2d2d">
+<section style="font-size:16px;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px;color:#2d2d2d;background:transparent">
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">为什么要自动化周报</h2>
 <p style="margin:0 0 14px 0">每周五下午写周报大概是程序员最头疼的事之一：翻聊天记录、回忆本周做了什么、整理进展、汇总风险... 我估了一下，每周至少花 <b style="font-weight:bold;color:#111827">2 小时</b>在这件事上。一年下来就是 100 多小时。</p>
 <section style="margin:16px 0;padding:14px 16px;background:#f8f8f8;border-left:4px solid #2563eb"><p style="margin:0;font-size:14px;font-style:italic;color:#888;line-height:1.9">如果说有什么任务最适合交给 AI 来做，周报绝对是其中之一——它的格式固定、信息来源明确、不需要创造性思考。</p></section>
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">整体思路</h2>
 <p style="margin:0 0 14px 0">自动化周报的核心流程其实很简单：</p>
-<p style="margin:0 0 14px 0">1. <b style="font-weight:bold;color:#111827">收集</b>：从 Git 提交记录、项目管理工具、聊天记录中提取本周工作内容 2. <b style="font-weight:bold;color:#111827">整理</b>：用 LLM 对收集到的信息进行归纳、分类、去重 3. <b style="font-weight:bold;color:#111827">生成</b>：按固定模板生成结构化的周报文档 4. <b style="font-weight:bold;color:#111827">推送</b>：自动发送到飞书/钉钉/企业微信</p>
+<ol style="margin:0 0 14px 0;padding-left:24px"><li style="margin:0 0 6px 0;line-height:1.9"><b style="font-weight:bold;color:#111827">收集</b>：从 Git 提交记录、项目管理工具、聊天记录中提取本周工作内容</li><li style="margin:0 0 6px 0;line-height:1.9"><b style="font-weight:bold;color:#111827">整理</b>：用 LLM 对收集到的信息进行归纳、分类、去重</li><li style="margin:0 0 6px 0;line-height:1.9"><b style="font-weight:bold;color:#111827">生成</b>：按固定模板生成结构化的周报文档</li><li style="margin:0 0 6px 0;line-height:1.9"><b style="font-weight:bold;color:#111827">推送</b>：自动发送到飞书/钉钉/企业微信</li></ol>
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">技术选型</h2>
 <p style="margin:0 0 14px 0">我最终选用的技术栈如下：</p>
 <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">
@@ -60,28 +60,63 @@
 
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">收集模块的实现</h2>
 <p style="margin:0 0 14px 0">收集模块是整个 Agent 的基础。核心代码如下：</p>
-<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto">
-  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre">def collect_git_commits(repo_path: str, since: str) -&gt; list[dict]:<br>    """从 Git 仓库收集指定日期之后的提交记录"""<br>    repo = git.Repo(repo_path)<br>    commits = []<br>    for commit in repo.iter_commits(since=since):<br>        commits.append({<br>            "hash": commit.hexsha[:8],<br>            "message": commit.message.strip(),<br>            "date": commit.committed_datetime.isoformat(),<br>            "author": commit.author.name,<br>        })<br>    return commits</code>
+<section class="code-snippet__fix code-snippet__js">
+<ul class="code-snippet__line-index code-snippet__js"><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ul>
+<pre class="code-snippet__js" data-lang="python">
+<code><span leaf=""><span class="code-snippet__keyword">def</span> <span class="code-snippet__title">collect_git_commits</span>(repo_path: <span class="code-snippet__built_in">str</span>, since: <span class="code-snippet__built_in">str</span>) -&gt; <span class="code-snippet__built_in">list</span>[<span class="code-snippet__built_in">dict</span>]:</span></code>
+<code><span leaf="">    <span class="code-snippet__string">"""从 Git 仓库收集指定日期之后的提交记录"""</span></span></code>
+<code><span leaf="">    repo = git.Repo(repo_path)</span></code>
+<code><span leaf="">    commits = []</span></code>
+<code><span leaf="">    <span class="code-snippet__keyword">for</span> commit in repo.iter_commits(since=since):</span></code>
+<code><span leaf="">        commits.append({</span></code>
+<code><span leaf="">            <span class="code-snippet__string">"</span><span class="code-snippet__string">hash</span><span class="code-snippet__string">"</span>: commit.hexsha[:<span class="code-snippet__number">8</span>],</span></code>
+<code><span leaf="">            <span class="code-snippet__string">"</span><span class="code-snippet__string">message</span><span class="code-snippet__string">"</span>: commit.message.strip(),</span></code>
+<code><span leaf="">            <span class="code-snippet__string">"</span><span class="code-snippet__string">date</span><span class="code-snippet__string">"</span>: commit.committed_datetime.isoformat(),</span></code>
+<code><span leaf="">            <span class="code-snippet__string">"</span><span class="code-snippet__string">author</span><span class="code-snippet__string">"</span>: commit.author.name,</span></code>
+<code><span leaf="">        })</span></code>
+<code><span leaf="">    <span class="code-snippet__keyword">return</span> commits</span></code>
+</pre>
 </section>
-<p style="margin:0 0 14px 0"><b style="font-weight:bold;color:#111827">关键点</b>： - 使用 <code style="font-size:13px;background:#f5f5f5;color:#2563eb;padding:2px 6px">since</code> 参数过滤本周的提交，避免处理过多历史数据 - 提取 commit message 的第一行作为摘要，减少 LLM 的输入噪声 - 保留 hash 方便溯源</p>
+<p style="margin:0 0 14px 0"><b style="font-weight:bold;color:#111827">关键点</b>：</p>
+<ul style="margin:0 0 14px 0;padding-left:24px"><li style="margin:0 0 6px 0;line-height:1.9">使用 <code style="font-size:13px;background:#f5f5f5;color:#2563eb;padding:2px 6px">since</code> 参数过滤本周的提交，避免处理过多历史数据</li><li style="margin:0 0 6px 0;line-height:1.9">提取 commit message 的第一行作为摘要，减少 LLM 的输入噪声</li><li style="margin:0 0 6px 0;line-height:1.9">保留 hash 方便溯源</li></ul>
 <section style="margin:16px 0;padding:14px 16px;background:#f8f8f8;border-left:4px solid #2563eb"><p style="margin:0;font-size:14px;font-style:italic;color:#888;line-height:1.9">如果你的团队使用 Conventional Commits 规范（如 <code style="font-size:13px;background:#f5f5f5;color:#2563eb;padding:2px 6px">feat: xxx</code>、<code style="font-size:13px;background:#f5f5f5;color:#2563eb;padding:2px 6px">fix: xxx</code>），收集后的信息质量会高很多，建议推广。</p></section>
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">整理模块：让 LLM 做归纳</h2>
 <p style="margin:0 0 14px 0">收集到的原始信息通常是碎片化的，需要 LLM 来归纳整理。我设计了一个专门的 Prompt：</p>
-<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto">
-  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre">你是一个周报助手。根据以下 Git 提交记录和任务卡片信息，<br>按「已完成」「进行中」「遇到的风险」三个类别进行归纳。<br>每条不超过 50 字，用动宾短语开头。<br><br>原始信息：<br>{raw_data}</code>
+<section class="code-snippet__fix code-snippet__js">
+<ul class="code-snippet__line-index code-snippet__js"><li></li><li></li><li></li><li></li><li></li><li></li></ul>
+<pre class="code-snippet__js">
+<code><span leaf="">你是一个周报助手。根据以下 Git 提交记录和任务卡片信息，</span></code>
+<code><span leaf="">按「已完成」「进行中」「遇到的风险」三个类别进行归纳。</span></code>
+<code><span leaf="">每条不超过 50 字，用动宾短语开头。</span></code>
+<code><span leaf="">&#8203;</span></code>
+<code><span leaf="">原始信息：</span></code>
+<code><span leaf="">{raw_data}</span></code>
+</pre>
 </section>
 <p style="margin:0 0 14px 0">经过测试，GPT-4o-mini 在这个任务上的表现非常稳定，归纳准确率在 <b style="font-weight:bold;color:#111827">90%</b> 以上。</p>
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">推送到飞书</h2>
 <p style="margin:0 0 14px 0">生成周报后，通过飞书 Webhook 推送到指定群聊：</p>
-<section style="background:#f6f8fa;border:1px solid #e1e4e8;margin:16px 0;padding:16px;overflow-x:auto">
-  <code style="font-family:Menlo,Monaco,'Courier New',monospace;font-size:13px;color:#24292e;line-height:1.6;white-space:pre">def send_to_feishu(webhook_url: str, content: str):<br>    """通过飞书 Webhook 发送消息"""<br>    payload = {<br>        "msg_type": "interactive",<br>        "card": {<br>            "header": {"title": {"content": "本周工作周报"}},<br>            "elements": [{"tag": "markdown", "content": content}],<br>        },<br>    }<br>    requests.post(webhook_url, json=payload)</code>
+<section class="code-snippet__fix code-snippet__js">
+<ul class="code-snippet__line-index code-snippet__js"><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ul>
+<pre class="code-snippet__js" data-lang="python">
+<code><span leaf=""><span class="code-snippet__keyword">def</span> <span class="code-snippet__title">send_to_feishu</span>(webhook_url: <span class="code-snippet__built_in">str</span>, content: <span class="code-snippet__built_in">str</span>):</span></code>
+<code><span leaf="">    <span class="code-snippet__string">"""通过飞书 Webhook 发送消息"""</span></span></code>
+<code><span leaf="">    payload = {</span></code>
+<code><span leaf="">        <span class="code-snippet__string">"</span><span class="code-snippet__string">msg_type</span><span class="code-snippet__string">"</span>: <span class="code-snippet__string">"</span><span class="code-snippet__string">interactive</span><span class="code-snippet__string">"</span>,</span></code>
+<code><span leaf="">        <span class="code-snippet__string">"</span><span class="code-snippet__string">card</span><span class="code-snippet__string">"</span>: {</span></code>
+<code><span leaf="">            <span class="code-snippet__string">"</span><span class="code-snippet__string">header</span><span class="code-snippet__string">"</span>: {<span class="code-snippet__string">"</span><span class="code-snippet__string">title</span><span class="code-snippet__string">"</span>: {<span class="code-snippet__string">"</span><span class="code-snippet__string">content</span><span class="code-snippet__string">"</span>: <span class="code-snippet__string">"</span><span class="code-snippet__string">本周工作周报</span><span class="code-snippet__string">"</span>}},</span></code>
+<code><span leaf="">            <span class="code-snippet__string">"</span><span class="code-snippet__string">elements</span><span class="code-snippet__string">"</span>: [{<span class="code-snippet__string">"</span><span class="code-snippet__string">tag</span><span class="code-snippet__string">"</span>: <span class="code-snippet__string">"</span><span class="code-snippet__string">markdown</span><span class="code-snippet__string">"</span>, <span class="code-snippet__string">"</span><span class="code-snippet__string">content</span><span class="code-snippet__string">"</span>: content}],</span></code>
+<code><span leaf="">        },</span></code>
+<code><span leaf="">    }</span></code>
+<code><span leaf="">    requests.post(webhook_url, json=payload)</span></code>
+</pre>
 </section>
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">最终效果</h2>
 <p style="margin:0 0 14px 0">部署上线后，每周五下午 5 点自动执行，2 分钟内完成全部流程：</p>
-<p style="margin:0 0 14px 0">- 自动拉取本周 Git 提交：约 200 条 - LLM 归纳整理：约 30 秒 - 生成飞书卡片：即时 - 推送到群聊：即时</p>
+<ul style="margin:0 0 14px 0;padding-left:24px"><li style="margin:0 0 6px 0;line-height:1.9">自动拉取本周 Git 提交：约 200 条</li><li style="margin:0 0 6px 0;line-height:1.9">LLM 归纳整理：约 30 秒</li><li style="margin:0 0 6px 0;line-height:1.9">生成飞书卡片：即时</li><li style="margin:0 0 6px 0;line-height:1.9">推送到群聊：即时</li></ul>
 <p style="margin:0 0 14px 0"><b style="font-weight:bold;color:#111827">每周节省约 2 小时</b>，周报质量比手写的更好——因为 AI 不会遗漏任何一条提交。</p>
 <h2 style="margin:28px auto 18px;padding:8px 24px;font-size:18px;font-weight:bold;color:#fff;background:#2563eb;text-align:center;display:block;width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">下一步优化</h2>
-<p style="margin:0 0 14px 0">- 接入 Jira/Tapd 自动拉取任务状态 - 支持多仓库聚合 - 增加与上周对比差异高亮 - 支持 Agent 主动提问补充信息</p>
+<ul style="margin:0 0 14px 0;padding-left:24px"><li style="margin:0 0 6px 0;line-height:1.9">接入 Jira/Tapd 自动拉取任务状态</li><li style="margin:0 0 6px 0;line-height:1.9">支持多仓库聚合</li><li style="margin:0 0 6px 0;line-height:1.9">增加与上周对比差异高亮</li><li style="margin:0 0 6px 0;line-height:1.9">支持 Agent 主动提问补充信息</li></ul>
 </section>
 
 
