@@ -353,6 +353,13 @@ SqlNode node = parser.parseQuery();
 | `title_font_size` | `22px` | 文章主标题 |
 | `text_font_size` | `16px` | 正文文字 |
 | `h2_font_size` | `18px` | H2 标题 |
+| `h2_style` | `pill` | H2 样式：`pill` / `quote_line` / `badge_block` / `center_card` |
+| `h2_badge_bg` | `#f7b731` | `badge_block` 编号徽章背景色 |
+| `h2_badge_text` | `#ffffff` | `badge_block` 编号徽章文字色 |
+| `h2_index_bg` | `accent` | `center_card` 编号卡背景色 |
+| `h2_index_text` | `#ffffff` | `center_card` 编号卡文字色 |
+| `font_family` | 系统中文字体栈 | 页面字体栈 |
+| `content_bg` | `transparent` | 正文区背景色 |
 | `cover_label` | `AI 实践观察` | 封面副标题 |
 | `footer` | `""` | 底部署名（空字符串不显示） |
 | `ending_lines` | 5 行默认尾栏 | 文末尾栏，`[]` 关闭，支持 HTML 标签 |
@@ -361,23 +368,27 @@ SqlNode node = parser.parseQuery();
 
 #### 🎨 预设样式速查（自然语言 → 配置文件）
 
-文章模式内置 3 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
+文章模式内置 6 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
 
 | 预设 | 配置文件 | 视觉特征 | 自然语言触发词 |
 |------|---------|---------|--------------|
-| 默认 | `references/article_default.yaml` | 白底灰字 + 棕色标签标题 | "默认样式"、"白色"、"白底"、"常规" |
-| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 古铜暖棕强调色 | "怀旧"、"泛黄"、"古风"、"历史"、"报纸"、"典籍" |
-| 科技蓝紫 | `references/article_modern.yaml` | 冷色调蓝紫渐变 + 深色封面 | "科技"、"蓝紫"、"现代"、"AI"、"炫酷" |
+| 默认 | `references/article_default.yaml` | 白底灰字 + 棕橘胶囊标题 | "默认样式"、"白色"、"白底"、"常规"、"简洁"、"干净" |
+| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 深棕胶囊标题 | "怀旧"、"泛黄"、"古风"、"古卷"、"黄底"、"暖黄"、"典籍" |
+| 科技蓝紫 | `references/article_modern.yaml` | 白底 + 蓝紫胶囊标题 + 深蓝封面 | "科技"、"蓝紫"、"蓝紫渐变"、"AI"、"技术"、"现代"、"前沿" |
+| 青绿引号 | `references/article_journal.yaml` | 米白底 + 青绿引号线 H2（大 Q + 引号包裹标题） | "青绿"、"青绿引号"、"引号标题"、"文艺"、"杂志"、"专栏"、"清爽" |
+| 角标绿条 | `references/article_growth.yaml` | 白底 + 黄色编号角标 + 绿色标签块 H2 | "角标"、"角标绿条"、"编号角标"、"badge"、"清单"、"步骤"、"运营" |
+| 中轴蓝卡 | `references/article_blueprint.yaml` | 冷灰底 + 中轴蓝色编号卡 H2（居中编号 + 两侧横线） | "中轴"、"中轴蓝卡"、"编号卡"、"center"、"灰底"、"冷灰"、"产品文档" |
 
 ```bash
 # 直接用 --config 引用预设
 python3 scripts/md2wechat_html.py --config references/article_nostalgic.yaml story.md
 python3 scripts/push_daily.py --config references/article_modern.yaml story.md
+python3 scripts/md2wechat_html.py --config references/article_journal.yaml story.md
 ```
 
 #### 🔧 如何新增自定义配置
 
-内置的 3 种预设样式不能满足需求时，有两种方式新增自定义配置：
+内置的 6 种预设样式不能满足需求时，有两种方式新增自定义配置：
 
 **方式一：修改全局配置文件**（影响所有未指定 `--config` 的文章模式推送）
 
@@ -592,6 +603,24 @@ mukun_md_push/
 
 ## 📋 修改说明
 
+### 2026-06-04
+
+- **新增 3 种文章模式预设样式**：在原有 3 种（默认/泛黄怀旧/科技蓝紫）基础上新增清爽专栏、内容增长、蓝图科技，预设总数从 3 种扩展为 6 种。每个预设对应 `references/` 下独立的 YAML 配置文件
+- **后三种预设重命名为具象描述型名称**：
+  - 清爽专栏 → **青绿引号**（颜色锚点"青绿" + 视觉锚点"大 Q 引号包裹标题"）
+  - 内容增长 → **角标绿条**（两个视觉锚点"黄色数字角标" + "绿色标签块"）
+  - 蓝图科技 → **中轴蓝卡**（结构锚点"居中蓝色编号卡" + "两侧横线"）
+- **视觉特征描述更新**：六种预设的描述均改为对应视觉锚点，让用户听名字就能在脑海中浮现画面
+- **自然语言触发词全面优化**：消除关键词冲突与歧义
+  - "绿" 同时命中两种 → 拆分为"青绿"（青绿引号）和"角标绿条""绿底封面"（角标绿条）
+  - "科技"被蓝图和科技蓝紫共享 → 蓝图改用"产品文档""技术手册"；科技蓝紫保留"科技""技术"
+  - "编号"/"编号卡" 同时命中两种 → 拆分为"角标编号"（角标绿条）和"中轴编号""编号卡"（中轴蓝卡）
+  - "深色"误导（科技蓝紫是白底不是深色模式）→ 改为"深蓝封面"
+  - "报纸"误导（怀旧不是报纸风格，报纸风格在新闻模式）→ 移除，新增"古卷""暖黄"
+  - "炫酷""quote""复盘""普通"等太泛或英文依赖过高的词 → 移除，改用更精准的中文描述
+  - 每类新增底色系触发词（白底/黄底/暖黄/灰底/冷灰/蓝灰底），提升匹配精准度
+- **SKILL.md、README.md 预设表格和匹配规则同步更新**：预设数量从"3 种"修正为"6 种"，新增 `references/article_journal.yaml` 的命令示例
+- **6 个 YAML 配置文件注释更新**：注释中的样式名称、视觉描述、适用场景、触发词全部同步为最新版本
 ### 2026-05-30
 
 - **掘金图片上传完整重写**：从 HAR 文件逆向掘金编辑器图片粘贴行为，完整还原 ImageX 5 步上传流程（gen_token → ApplyImageUpload → 上传二进制 → CommitImageUpload → get_img_url）
