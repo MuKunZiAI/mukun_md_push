@@ -34,18 +34,24 @@ allowed-tools: Read, Bash, Write
 
 ### 文章模式预设样式
 
-文章模式内置 3 种预设样式，用户用自然语言描述即可自动匹配。每个预设对应 `references/` 目录下一个独立的 YAML 配置文件，既可被 SKILL.md 用自然语言匹配，也可直接通过 `--config` 传入脚本使用。
+文章模式内置 6 种预设样式，用户用自然语言描述即可自动匹配。每个预设对应 `references/` 目录下一个独立的 YAML 配置文件，既可被 SKILL.md 用自然语言匹配，也可直接通过 `--config` 传入脚本使用。
 
 | 预设 | 配置文件 | 视觉特征 | 自然语言触发词（含任一即匹配） |
 |------|---------|---------|--------------------------|
-| 默认 | `references/article_default.yaml` | 白底灰字 + 棕色标签标题 | 默认、默认样式、白色、白底、常规、普通 |
-| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 古铜暖棕强调色 | 怀旧、泛黄、古风、历史、报纸、典籍、复古 |
-| 科技蓝紫 | `references/article_modern.yaml` | 冷色调蓝紫渐变 + 深色封面 | 科技、蓝紫、现代、AI、技术、炫酷、深色 |
+| 默认 | `references/article_default.yaml` | 白底灰字 + 棕橘胶囊标题 | 默认、默认样式、白色、白底、常规、简洁、干净、基础 |
+| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 深棕胶囊标题 | 怀旧、泛黄、古风、古卷、黄底、暖黄、米黄底、历史、典籍、复古 |
+| 科技蓝紫 | `references/article_modern.yaml` | 白底 + 蓝紫胶囊标题 + 深蓝封面 | 科技、蓝紫、科技蓝紫、蓝紫渐变、AI、技术、现代、前沿、潮流、深蓝封面 |
+| 青绿引号 | `references/article_journal.yaml` | 米白底 + 青绿引号线 H2（大 Q + 引号包裹标题） | 青绿、青绿引号、引号标题、引号线、文艺、杂志、专栏、清爽、雅致、小清新 |
+| 角标绿条 | `references/article_growth.yaml` | 白底 + 黄色编号角标 + 绿色标签块 H2 | 角标、角标绿条、角标编号、编号角标、badge、清单、步骤、运营、资讯、拆解、模块化、绿底封面 |
+| 中轴蓝卡 | `references/article_blueprint.yaml` | 冷灰底 + 中轴蓝色编号卡 H2（居中编号 + 两侧横线） | 中轴、中轴蓝卡、中轴编号、编号卡、center、灰底、冷灰、蓝灰底、蓝色、产品文档、技术手册、结构化、规范、正式 |
 
 **匹配规则**：
-- 用户提及"默认样式"/"白色"/"白底"/"常规" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_default.yaml`
-- 用户提及"怀旧"/"泛黄"/"古风"/"历史"/"报纸"/"典籍"/"复古" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml`
-- 用户提及"科技"/"蓝紫"/"现代"/"AI"/"技术"/"炫酷"/"深色" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_modern.yaml`
+- 用户提及"默认样式"/"白色"/"白底"/"常规"/"简洁"/"干净"/"基础" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_default.yaml`
+- 用户提及"怀旧"/"泛黄"/"古风"/"古卷"/"黄底"/"暖黄"/"米黄底"/"历史"/"典籍"/"复古" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml`
+- 用户提及"科技"/"蓝紫"/"科技蓝紫"/"蓝紫渐变"/"AI"/"技术"/"现代"/"前沿"/"潮流"/"深蓝封面" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_modern.yaml`
+- 用户提及"青绿"/"青绿引号"/"引号标题"/"引号线"/"文艺"/"杂志"/"专栏"/"清爽"/"雅致"/"小清新" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_journal.yaml`
+- 用户提及"角标"/"角标绿条"/"角标编号"/"编号角标"/"badge"/"清单"/"步骤"/"运营"/"资讯"/"拆解"/"模块化"/"绿底封面" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_growth.yaml`
+- 用户提及"中轴"/"中轴蓝卡"/"中轴编号"/"编号卡"/"center"/"灰底"/"冷灰"/"蓝灰底"/"蓝色"/"产品文档"/"技术手册"/"结构化"/"规范"/"正式" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_blueprint.yaml`
 - 用户未提及任何风格关键词 → **默认使用 `references/article_default.yaml`**
 
 **执行方式**：识别到风格关键词后，通过 `--config` 参数传入对应的 reference 文件：
