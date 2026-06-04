@@ -7,6 +7,14 @@ wechat:
   appid: your_appid       # 公众号 AppID（推送草稿箱必填）
   secret: your_secret     # 公众号 AppSecret（推送草稿箱必填）
 
+# ─── 稀土掘金配置 ─────────────────────────────────────────────────────────
+juejin:
+  cookie: "sessionid=你的sessionid"    # 掘金 Cookie（必填，约30天有效期）
+  category_id: "6809637773935378440"   # 默认分类 ID（可选，AI=6809637773935378440, 后端=6809637769959178254）
+  tag_ids: "6809640445233070098"       # 默认标签 ID（可选，逗号分隔）
+
+  # 获取 Cookie：登录 juejin.cn → F12 → Application → Cookies → 复制 sessionid 等完整 Cookie 字符串
+
 # ─── 样式配置 ─────────────────────────────────────────────────────────────────
 style:
 

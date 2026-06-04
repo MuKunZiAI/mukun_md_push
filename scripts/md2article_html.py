@@ -60,6 +60,13 @@ def _build_article_html(s, title, content, footer_section="", ending_section="")
     text_color = s.get("text", s.get("dark", "rgb(85,85,85)"))
     rule = s.get("rule", "#c4a882")
 
+    # 如果 markdown 没有 # 一级标题，去掉空白封面区
+    if not title:
+        t = re.sub(
+            r'<!-- 封面 -->.*?</section>\s*\n',
+            '', t, flags=re.DOTALL
+        )
+
     for name, val in [
         ("BG", s["bg"]),
         ("FONT_FAMILY", s.get("font_family", "-apple-system,'PingFang SC','Microsoft YaHei',sans-serif")),
@@ -304,11 +311,12 @@ def parse_article(md_text):
         if ol_match:
             flush_para()
             flush_table()
+            marker_value = int(ol_match.group(1))
             item_text = ol_match.group(2)
 
             _flush_lists_to_indent(indent)
 
-            item_data = {"text": item_text, "children": None}
+            item_data = {"text": item_text, "value": marker_value, "children": None}
             if list_stack and list_stack[-1]["indent"] == indent and list_stack[-1]["type"] == "ol":
                 list_stack[-1]["items"].append(item_data)
             else:
@@ -590,10 +598,14 @@ def render_footer(s):
 def _render_list_block(block, s):
     """递归渲染列表块（ol/ul/task），支持任意层级嵌套"""
     list_type = block["type"]
+    list_attrs = ""
 
     if list_type == "ol":
         tag = "ol"
         list_style = 'margin:0 0 14px 0;padding-left:24px'
+        first_value = block["items"][0].get("value") if block.get("items") else None
+        if isinstance(first_value, int) and first_value > 0:
+            list_attrs = f' start="{first_value}"'
     elif list_type == "task":
         tag = "ul"
         list_style = 'margin:0 0 14px 0;padding-left:24px;list-style:none'
@@ -625,17 +637,86 @@ def _render_list_block(block, s):
             elif isinstance(children, dict):
                 children_html = _render_list_block(children, s)
 
+        li_attrs = ""
+        if list_type == "ol":
+            marker_value = item.get("value")
+            if isinstance(marker_value, int) and marker_value > 0:
+                li_attrs = f' value="{marker_value}"'
+
         if children_html:
             items_html.append(
-                f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}{children_html}</li>'
+                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9">{li_content}{children_html}</li>'
             )
         else:
             items_html.append(
-                f'<li style="margin:0 0 6px 0;line-height:1.9">{li_content}</li>'
+                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9">{li_content}</li>'
             )
 
     # 去除 \\n：微信编辑器会把 HTML 元素间的换行解释为新列表项，产生多余带点空行
-    return f'<{tag} style="{list_style}">' + ''.join(items_html) + f'</{tag}>'
+    return f'<{tag}{list_attrs} style="{list_style}">' + ''.join(items_html) + f'</{tag}>'
+
+
+def _h2_index_text(index):
+    return f"{index:02d}"
+
+
+def render_h2(text, s, index):
+    """渲染 H2（支持多种样式）"""
+    style = s.get("h2_style", "pill")
+    accent = s.get("accent", "#333")
+    h2_size = s.get("h2_font_size", "18px")
+    rule = s.get("rule", "#ddd")
+    bold_color = s.get("bold", "#333")
+    badge_bg = s.get("h2_badge_bg", "#f7b731")
+    badge_text = s.get("h2_badge_text", "#ffffff")
+    index_bg = s.get("h2_index_bg", accent)
+    index_text = s.get("h2_index_text", "#ffffff")
+    label = format_text(escape_html(text), s)
+
+    if style == "quote_line":
+        return (
+            f'<section style="margin:30px 0 20px 0;text-align:center">'
+            f'<p style="margin:0 0 8px 0;font-size:56px;color:{accent};opacity:0.12;line-height:0.8;font-weight:bold">Q</p>'
+            f'<h2 style="margin:0;font-size:{h2_size};font-weight:bold;color:{accent};line-height:1.6;display:block;background:none;padding:0">'
+            f'“{label}”</h2>'
+            f'<p style="margin:10px auto 0 auto;width:62%;max-width:420px;border-top:3px solid {accent};height:0"></p>'
+            f'</section>'
+        )
+
+    if style == "badge_block":
+        return (
+            f'<section style="margin:30px 0 18px 0">'
+            f'<p style="margin:0;line-height:1;text-align:left">'
+            f'<span style="display:inline-block;vertical-align:top;background:{badge_bg};color:{badge_text};padding:10px 14px;border-radius:0 0 18px 18px;'
+            f'font-size:24px;font-weight:bold;letter-spacing:1px">{_h2_index_text(index)}</span>'
+            f'<span style="display:inline-block;vertical-align:top;margin-left:8px;background:{accent};color:#fff;padding:12px 16px;'
+            f'font-size:{h2_size};font-weight:bold;line-height:1.4">{label}</span>'
+            f'</p>'
+            f'<p style="margin:12px 0 0 0;border-top:3px solid {accent};height:0"></p>'
+            f'</section>'
+        )
+
+    if style == "center_card":
+        return (
+            f'<section style="margin:34px 0 24px 0;text-align:center">'
+            f'<p style="margin:0;line-height:1">'
+            f'<span style="display:inline-block;vertical-align:middle;width:34%;border-top:2px solid {rule};height:0"></span>'
+            f'<span style="display:inline-block;vertical-align:middle;margin:0 10px;background:{index_bg};color:{index_text};padding:9px 14px;'
+            f'font-size:24px;font-weight:bold;line-height:1;min-width:48px">{_h2_index_text(index)}</span>'
+            f'<span style="display:inline-block;vertical-align:middle;width:34%;border-top:2px solid {rule};height:0"></span>'
+            f'</p>'
+            f'<h2 style="margin:16px 0 0 0;font-size:{h2_size};font-weight:bold;color:{bold_color};line-height:1.5;display:block;background:none;padding:0">'
+            f'{label}</h2>'
+            f'</section>'
+        )
+
+    # 默认胶囊样式（保持历史兼容）
+    return (
+        f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:{h2_size};font-weight:bold;color:#fff;'
+        f'background:{accent};text-align:center;display:block;'
+        f'width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
+        f'{label}</h2>'
+    )
 
 
 def _h2_index_text(index):
