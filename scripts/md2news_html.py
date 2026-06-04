@@ -432,6 +432,14 @@ def generate_html(data, s):
     content = '\n'.join(sections_html)
 
     template = _build_template(s)
+
+    # 如果 markdown 没有 # 一级标题，去掉空白封面区和信息来源栏
+    if not data["title"]:
+        template = re.sub(
+            r'<!-- hero / cover -->.*?<!-- meta -->.*?</section>\s*\n',
+            '', template, flags=re.DOTALL
+        )
+
     return template.format(
         title=escape_html(data["title"]),
         meta=format_text(data["meta"], s),

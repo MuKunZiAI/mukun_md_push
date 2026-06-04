@@ -1,6 +1,6 @@
 ---
 name: mukun-md-push-wechat
-description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持文章模式（默认）和新闻模式。当用户提到"md转微信html""推送公众号""转换微信公众号格式"等意图时触发此技能。
+description: 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可进一步推送到微信公众号草稿箱。支持日报模式（默认）、长文/历史故事模式（--essay）、AI 文章模式（--ai）。支持推送 Markdown 到稀土掘金草稿箱。当用户提到"md转微信html""推送公众号""转换微信公众号格式""推送到掘金""掘金草稿"等意图时触发此技能。
 allowed-tools: Read, Bash, Write
 ---
 
@@ -18,8 +18,9 @@ allowed-tools: Read, Bash, Write
 |---------|---------|---------|
 | 「把这篇md转成微信html」「md转微信格式」「生成微信html」 | 仅转换 HTML | `${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py` |
 | 「推送/发布到公众号」「先转换再推送到公众号」 | 转换 + 推送草稿箱 | `${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py` |
+| 「推送到掘金」「掘金草稿」「发到掘金」 | 推送掘金草稿箱 | `${CODEBUDDY_SKILL_DIR}/scripts/push_juejin.py` |
 
-**决策原则**：技能 2（推送）已包含技能 1（转换），无需同时调用两者。
+**决策原则**：技能 2（推送公众号）已包含技能 1（转换），技能 3（推送掘金）独立使用 mark_content，无需同时调用。
 
 **默认模式**：用户未明确指定时，使用文章模式（`--article`）。仅在以下情况使用新闻模式（`--news`）：
 - 用户明确说"新闻模式""用新闻模式""--news"
@@ -54,14 +55,6 @@ allowed-tools: Read, Bash, Write
 - 用户提及"中轴"/"中轴蓝卡"/"中轴编号"/"编号卡"/"center"/"灰底"/"冷灰"/"蓝灰底"/"蓝色"/"产品文档"/"技术手册"/"结构化"/"规范"/"正式" → 使用 `${CODEBUDDY_SKILL_DIR}/references/article_blueprint.yaml`
 - 用户未提及任何风格关键词 → **默认使用 `references/article_default.yaml`**
 
-**执行方式**：识别到风格关键词后，通过 `--config` 参数传入对应的 reference 文件：
-```bash
-# 示例：用户说"用怀旧风格转成微信公众号 HTML"
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --config ${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml --article story.md
-
-# 推送时同理
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --config ${CODEBUDDY_SKILL_DIR}/references/article_nostalgic.yaml --article story.md --digest "..."
-```
 
 ## 技能 1：Markdown → 微信 HTML
 
@@ -70,44 +63,32 @@ python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --config ${CODEBUDDY_SKILL_
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py <input.md> [output.html]
 ```
 
-两种转换模式：
-- **文章模式（默认）**：长文叙事渲染，默认白底灰字 + 棕色标签标题，可通过 config.yaml 配置为泛黄报纸风格或任意自定义配色
-- **新闻模式（`--news`）**：一条消息对应一条新闻，分板块展示，报纸风格配色（需用户明确指定）
+三种转换模式：
+- **日报模式（默认）**：一条消息对应一条新闻，分四大板块，报纸风格配色
+- **长文/历史故事模式（`--essay`）**：泛黄报纸风格背景，适合成语典故、历史故事类长文
+- **AI 文章模式（`--ai`）**：白底灰字 + 棕色标签二级标题 + 固定尾栏，适合 AI 实践类文章
 
 示例：
 ```bash
-# 文章模式（默认）
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py story.md story_wechat.html
+# 日报模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py article.md article_wechat.html
 
-# 新闻模式（明确指定）
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --news article.md article_wechat.html
+# 长文模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --essay story.md story_wechat.html
 
-# 指定配置文件
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --config /path/to/config.yaml --article story.md
+# AI文章模式
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2wechat_html.py --ai ai_article.md ai_wechat.html
 ```
 
-也可直接调用独立脚本：
-```bash
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2news_html.py article.md
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/md2article_html.py --config /path/to/config.yaml story.md
-```
-
-输出 HTML 文件保存在当前工作目录。若未指定输出文件，则自动生成（`_news_wechat.html` 或 `_article_wechat.html`）。
+输出 HTML 文件保存在当前工作目录。若未指定 output.html，则根据模式自动生成文件名后缀（`_wechat.html`、`_essay_wechat.html`、`_ai_wechat.html`）。
 
 ## 技能 2：转换 + 推送草稿箱
 
 调用脚本：
 ```bash
-# 文章模式（默认）
 python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
-# 新闻模式（明确指定）
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --news <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
-
-# 更新已有草稿（追加 --update，注意 input.md 必须在 --update 之前，否则会被误判为 media_id）
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py <input.md> --update MEDIA_ID [--title TITLE] [--cover COVER] [--digest DIGEST]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --article <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
-python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --news <input.md> --update [--title TITLE] [--cover COVER] [--digest DIGEST]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --essay <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_daily.py --ai <input.md> [--title TITLE] [--cover COVER] [--digest DIGEST] [--media-id MEDIA_ID]
 ```
 
 支持 Markdown frontmatter 提取标题和摘要：
@@ -130,24 +111,112 @@ digest: 手动摘要（80字以内）
    - 不要使用 markdown 格式或 HTML 标签
    - 不要以「本文」「这篇文章」开头
 4. **调用 `push_daily.py`**：将生成的摘要通过 `--digest` 参数传入（若 frontmatter 已有 digest 则使用 frontmatter 中的值）
-5. 脚本自动执行：Markdown → HTML → 上传封面图 → 上传正文图片素材 → 推送草稿箱
+5. 脚本自动执行：Markdown → HTML → 上传封面图 → 推送草稿箱
 
 > **注意**：摘要生成是必选步骤，不可跳过。不要让脚本自动截取 120 字符——那会产生不完整的无意义截断。
 
-**图片处理流程**（推送时自动执行）：
-1. 从原始 Markdown 提取 `![](url)` 图片引用
-2. 解析到本地文件（支持相对路径、绝对路径、alt 描述模糊匹配）
-3. 计算文件内容 MD5，查缓存 `~/.md_push_wechat/config.yaml` 中 `image_cache.content`，命中则直接复用微信 CDN URL
-4. 未命中则上传到微信永久素材库 `cgi-bin/material/add_material`
-5. 将 HTML 中的 `src` 替换为微信 CDN URL，并保存缓存到 config.yaml
+**自动拆分**：当 HTML 内容超过 20000 字符限制时，脚本会自动按 H2 标题拆分为多篇合并推送（同一图文消息内，读者上滑查看），标题自动添加（上）（中）（下）后缀。拆分后非首篇的摘要由脚本自动生成，无需手动处理。
 
-**封面图缓存**：
-- 封面图 media_id 基于文件内容 MD5 缓存到 config.yaml 的 `image_cache.cover` 段
-- 同一张封面图无论路径如何变化都会被识别并永久复用，无需重复上传
+## 技能 3：推送掘金草稿箱
 
-**草稿更新（`--update`）**：
-- `--update [MEDIA_ID]`：更新已有草稿而非新建。MEDIA_ID 可选，不传则自动读取上次新建时保存的 `~/.md_push_wechat/draft_media_id.txt`
-- 新闻/文章两种模式均支持更新
+调用脚本：
+```bash
+# 新建草稿
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_juejin.py <input.md> [--title TITLE] [--digest DIGEST] [--category ID] [--tags IDS]
+
+# 更新已有草稿
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_juejin.py <input.md> --update DRAFT_ID [--title TITLE] [--digest DIGEST]
+
+# 查询标签
+python3 ${CODEBUDDY_SKILL_DIR}/scripts/push_juejin.py --query-tags KEYWORD
+```
+
+支持 Markdown frontmatter 提取元数据：
+```yaml
+---
+title: 文章标题
+digest: 摘要（50-100字）
+category_id: "6809637773935378440"
+tag_ids: "6809640408797167623,6809640445233070098"
+cover_image: https://p1-juejin.byteimg.com/xxxxx
+---
+```
+
+### 工作流
+
+1. 读取 `~/.md_push_wechat/config.yaml` 获取 `juejin.cookie` 和默认分类/标签
+2. 解析 Markdown frontmatter 提取标题、摘要、分类、标签
+3. 扫描正文中的本地图片引用，尝试上传到掘金图床（通过 ImageX/gen_token）
+4. 替换 mark_content 中的本地图片为掘金 CDN URL
+5. 调用掘金创建/更新草稿 API
+
+### 参数
+
+| 参数 | 说明 |
+|------|------|
+| `--title` | 文章标题（覆盖 frontmatter） |
+| `--digest` | 摘要（50-100字，掘金硬性要求） |
+| `--category` | 分类 ID 或名称（如 "AI"、"后端"，自动转换） |
+| `--tags` | 标签 ID，逗号分隔（如 "6809640445233070098,6809640408797167623"） |
+| `--cover` | 封面图 URL（必须是掘金 CDN 地址） |
+| `--update DRAFT_ID` | 更新已有草稿 |
+| `--query-tags KEYWORD` | 查询可用标签 |
+
+### 分类 ID 速查表
+
+| 分类名称 | category_id |
+|----------|-------------|
+| 后端 | `6809637769959178254` |
+| 前端 | `6809637767543259144` |
+| Android | `6809635626879549454` |
+| iOS | `6809635626661445640` |
+| AI / 人工智能 | `6809637773935378440` |
+| 开发工具 | `6809637771511070734` |
+| 代码人生 | `6809637776263217160` |
+| 阅读 | `6809637772874219534` |
+
+> 运行 `python push_juejin.py --query-categories` 可在线获取最新分类列表。 |
+
+### 前置条件
+
+- 配置文件 `~/.md_push_wechat/config.yaml` 必须包含 `juejin.cookie`
+- Cookie 获取方式：登录 juejin.cn → F12 → Application → Cookies → 复制完整 Cookie 字符串
+- Cookie 有效期约 30 天，过期需重新获取
+
+### 图片上传
+
+脚本会尝试将 Markdown 中的本地图片上传到掘金图床，完整 ImageX 5 步流程：
+
+| 步骤 | 接口 | 说明 |
+|------|------|------|
+| 1. gen_token | `GET /imagex/v2/gen_token` | 获取 STS 临时凭证（ServiceId=73owjymdk6） |
+| 2. ApplyImageUpload | `GET imagex.bytedanceapi.com/?Action=ApplyImageUpload` | 获取上传地址，需要 AWS SigV4 签名 |
+| 3. 上传二进制 | `POST tos-d-x-lf.douyin.com/{store_uri}` | 实际上传文件，带 Content-CRC32 校验 |
+| 4. CommitImageUpload | `POST ?Action=CommitImageUpload&SessionKey=xxx` | 确认上传，SigV4 签名 |
+| 5. get_img_url | `GET /imagex/v2/get_img_url` | 获取 CDN URL（`https://p1-juejin.byteimg.com/...`） |
+
+**MD5 缓存**：上传后的 CDN URL 基于文件内容 MD5 缓存到 `config.yaml` 的 `image_cache.juejin` 段，同一张图片（即使路径不同）永久复用，无需重复上传。
+
+**关键实现细节**：
+- AWS SigV4 签名使用 `hmac` + `hashlib.sha256` 手动实现，参数排序确保 AWS 要求的字母顺序
+- 文件上传使用 POST + Content-CRC32 校验（非 PUT）
+- mark_content 中的本地路径替换为完整 CDN URL（`http(s)://` 开头），非 store_uri
+
+> 注意：图片上传功能为尽力而为模式。如上传失败，脚本会跳过该图片并保留原引用。
+
+微信公众号草稿接口有 **20000 字符限制**。脚本采用以下 CSS 继承策略压缩输出体积：
+
+- **`text-indent:0`** 统一写到 `<body style>` 一次，全文继承，各 `<p>/<h2>/<h3>` 不再重复（`text-indent` 是可继承属性）
+- **`color` / `font-size` / `line-height`** 提升到最近父级 `<section>`，子元素只保留差异化覆盖
+- **`<td>` 的 `color`** 从 `<body>` 继承，不在每个 `td` 重复
+- **空格规范**：style 属性内一律去掉冒号/分号后的空格，进一步节省
+
+实测节省效果（示例文件）：
+| 模式 | 优化前 | 优化后 | 节省 |
+|------|--------|--------|------|
+| 日报 | 9,324 字符 | 8,352 字符 | 972 字符 (10.4%) |
+| AI文章 | 9,527 字符 | 9,101 字符 | 426 字符 (4.5%) |
+| 长文 | 3,366 字符 | 3,156 字符 | 210 字符 (6.2%) |
 
 ## 前置检查
 
