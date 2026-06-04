@@ -719,6 +719,69 @@ def render_h2(text, s, index):
     )
 
 
+def _h2_index_text(index):
+    return f"{index:02d}"
+
+
+def render_h2(text, s, index):
+    """渲染 H2（支持多种样式）"""
+    style = s.get("h2_style", "pill")
+    accent = s.get("accent", "#333")
+    h2_size = s.get("h2_font_size", "18px")
+    rule = s.get("rule", "#ddd")
+    bold_color = s.get("bold", "#333")
+    badge_bg = s.get("h2_badge_bg", "#f7b731")
+    badge_text = s.get("h2_badge_text", "#ffffff")
+    index_bg = s.get("h2_index_bg", accent)
+    index_text = s.get("h2_index_text", "#ffffff")
+    label = format_text(escape_html(text), s)
+
+    if style == "quote_line":
+        return (
+            f'<section style="margin:30px 0 20px 0;text-align:center">'
+            f'<p style="margin:0 0 8px 0;font-size:56px;color:{accent};opacity:0.12;line-height:0.8;font-weight:bold">Q</p>'
+            f'<h2 style="margin:0;font-size:{h2_size};font-weight:bold;color:{accent};line-height:1.6;display:block;background:none;padding:0">'
+            f'“{label}”</h2>'
+            f'<p style="margin:10px auto 0 auto;width:62%;max-width:420px;border-top:3px solid {accent};height:0"></p>'
+            f'</section>'
+        )
+
+    if style == "badge_block":
+        return (
+            f'<section style="margin:30px 0 18px 0">'
+            f'<p style="margin:0;line-height:1;text-align:left">'
+            f'<span style="display:inline-block;vertical-align:top;background:{badge_bg};color:{badge_text};padding:10px 14px;border-radius:0 0 18px 18px;'
+            f'font-size:24px;font-weight:bold;letter-spacing:1px">{_h2_index_text(index)}</span>'
+            f'<span style="display:inline-block;vertical-align:top;margin-left:8px;background:{accent};color:#fff;padding:12px 16px;'
+            f'font-size:{h2_size};font-weight:bold;line-height:1.4">{label}</span>'
+            f'</p>'
+            f'<p style="margin:12px 0 0 0;border-top:3px solid {accent};height:0"></p>'
+            f'</section>'
+        )
+
+    if style == "center_card":
+        return (
+            f'<section style="margin:34px 0 24px 0;text-align:center">'
+            f'<p style="margin:0;line-height:1">'
+            f'<span style="display:inline-block;vertical-align:middle;width:34%;border-top:2px solid {rule};height:0"></span>'
+            f'<span style="display:inline-block;vertical-align:middle;margin:0 10px;background:{index_bg};color:{index_text};padding:9px 14px;'
+            f'font-size:24px;font-weight:bold;line-height:1;min-width:48px">{_h2_index_text(index)}</span>'
+            f'<span style="display:inline-block;vertical-align:middle;width:34%;border-top:2px solid {rule};height:0"></span>'
+            f'</p>'
+            f'<h2 style="margin:16px 0 0 0;font-size:{h2_size};font-weight:bold;color:{bold_color};line-height:1.5;display:block;background:none;padding:0">'
+            f'{label}</h2>'
+            f'</section>'
+        )
+
+    # 默认胶囊样式（保持历史兼容）
+    return (
+        f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:{h2_size};font-weight:bold;color:#fff;'
+        f'background:{accent};text-align:center;display:block;'
+        f'width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
+        f'{label}</h2>'
+    )
+
+
 def generate_html(data, s):
     """生成微信兼容 HTML（文章模式）"""
     content_parts = []
