@@ -142,7 +142,7 @@ rm -rf /tmp/mukun_md_push
 > "帮我把这篇 AI 周报转成新闻模式的微信公众号 HTML"
 
 <p align="center">
-  <img src="assets/news.png" alt="新闻模式" width="480" />
+  <img src="assets/news.JPG" alt="新闻模式" width="480" />
 </p>
 
 ### 文章模式（默认）
@@ -152,7 +152,7 @@ rm -rf /tmp/mukun_md_push
 白底灰字 + 棕橘胶囊标题，适合技术实践与深度文章：
 
 <p align="center">
-  <img src="assets/article_default.png" alt="文章模式-默认" width="480" />
+  <img src="assets/article_default.JPG" alt="文章模式-默认" width="480" />
 </p>
 
 ### 文章模式（泛黄怀旧）
@@ -162,7 +162,7 @@ rm -rf /tmp/mukun_md_push
 古卷泛黄底色 + 深棕胶囊标题，适合历史文化类叙事长文：
 
 <p align="center">
-  <img src="assets/article_nostalgic.png" alt="文章模式-泛黄怀旧" width="480" />
+  <img src="assets/article_nostalgic.JPG" alt="文章模式-泛黄怀旧" width="480" />
 </p>
 
 ### 文章模式（科技蓝紫）
@@ -172,7 +172,7 @@ rm -rf /tmp/mukun_md_push
 白底 + 蓝紫胶囊标题 + 深蓝封面，适合 AI 科技、技术前沿文章：
 
 <p align="center">
-  <img src="assets/article_modern.png" alt="文章模式-科技蓝紫" width="480" />
+  <img src="assets/article_modern.JPG" alt="文章模式-科技蓝紫" width="480" />
 </p>
 
 ### 文章模式（青绿引号）
@@ -182,7 +182,7 @@ rm -rf /tmp/mukun_md_push
 米白底 + 大 Q 引号包裹标题 + 青绿下划线，适合文艺随笔、杂志专栏：
 
 <p align="center">
-  <img src="assets/article_journal.png" alt="文章模式-青绿引号" width="480" />
+  <img src="assets/article_journal.JPG" alt="文章模式-青绿引号" width="480" />
 </p>
 
 ### 文章模式（角标绿条）
@@ -192,7 +192,7 @@ rm -rf /tmp/mukun_md_push
 白底 + 黄色编号角标 + 绿色标签块标题，适合清单拆解、运营资讯：
 
 <p align="center">
-  <img src="assets/article_growth.png" alt="文章模式-角标绿条" width="480" />
+  <img src="assets/article_growth.JPG" alt="文章模式-角标绿条" width="480" />
 </p>
 
 ### 文章模式（中轴蓝卡）
@@ -202,7 +202,7 @@ rm -rf /tmp/mukun_md_push
 冷灰底 + 中轴蓝色编号卡标题 + 两侧横线，适合产品文档、技术手册：
 
 <p align="center">
-  <img src="assets/article_blueprint.png" alt="文章模式-中轴蓝卡" width="480" />
+  <img src="assets/article_blueprint.JPG" alt="文章模式-中轴蓝卡" width="480" />
 </p>
 
 > 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，6 种预设配色配置文件参见 [references/](references/) 目录。
