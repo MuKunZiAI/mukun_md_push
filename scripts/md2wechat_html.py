@@ -25,6 +25,7 @@ def main():
     args = sys.argv[1:]
     mode = "article"  # 默认文章模式
     config_path = None
+    pass_through = []  # 透传给子脚本的参数（--no-title / --with-title）
 
     i = 0
     while i < len(args):
@@ -36,6 +37,8 @@ def main():
             i += 1
             if i < len(args):
                 config_path = args[i]
+        elif args[i] in ('--no-title', '--with-title'):
+            pass_through.append(args[i])
         else:
             break
         i += 1
@@ -48,6 +51,7 @@ def main():
         print("  python3 md2wechat_html.py --config <path> --article <input.md> [output.html]")
         print()
         print("不指定模式时默认为 --article。")
+        print("--no-title（默认，去除标题块）/ --with-title（保留标题块）")
         sys.exit(1)
 
     # 构建子脚本命令
@@ -59,7 +63,7 @@ def main():
     cmd = [sys.executable, script]
     if config_path:
         cmd.extend(["--config", config_path])
-    cmd.extend(positional)
+    cmd.extend(pass_through + positional)
 
     result = subprocess.run(cmd)
     sys.exit(result.returncode)
