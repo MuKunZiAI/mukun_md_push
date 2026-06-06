@@ -265,6 +265,14 @@ def parse_article(md_text):
             blocks.append({"type": "heading", "text": stripped[3:].strip(), "level": 2})
             continue
 
+        # H4 小标题（必须在 H3 之前，否则 #### 会误匹配 ### ）
+        if stripped.startswith('#### '):
+            _flush_all_lists()
+            flush_para()
+            flush_table()
+            blocks.append({"type": "heading", "text": stripped[5:].strip(), "level": 4})
+            continue
+
         # H3 子标题
         if stripped.startswith('### '):
             _flush_all_lists()
@@ -495,8 +503,24 @@ def render_table(rows, s):
 
 
 def render_blockquote(text, s):
-    """渲染引用块"""
-    formatted = format_text(escape_html(text.replace('\n', '<br>')), s)
+    """渲染引用块 —— 每行用独立 <p> 分段，避免 <br> 被转义"""
+    lines = text.split('\n')
+    parts = []
+    for line in lines:
+        escaped = escape_html(line)
+        formatted = format_text(escaped, s)
+        parts.append(
+            f'<p style="margin:0 0 8px 0;font-size:14px;font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
+        )
+    # 去掉最后一行多余的底部 margin
+    parts[-1] = parts[-1].replace('margin:0 0 8px 0', 'margin:0')
+    html = (
+        f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8;'
+        f'border-left:4px solid {s["accent"]}">'
+        f'{"".join(parts)}'
+        f'</section>'
+    )
+    return html
     html = (
         f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8'
         f';border-left:4px solid {s["accent"]}">'
@@ -851,6 +875,12 @@ def generate_html(data, s):
                 f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:{h3_color};line-height:1.5">'
                 f'{format_text(escape_html(text), s)}</p>'
             )
+        elif btype == "heading" and block["level"] == 4:
+            h4_color = s.get("h4_color", "#555")
+            content_parts.append(
+                f'<p style="margin:18px 0 10px 0;font-size:15px;font-weight:bold;color:{h4_color};line-height:1.5">'
+                f'{format_text(escape_html(text), s)}</p>'
+            )
         elif btype == "blockquote":
             content_parts.append(render_blockquote(text, s))
         elif btype == "code_block":
@@ -904,6 +934,7 @@ ARTICLE_DEFAULTS = {
     "h2_index_bg": "rgb(198,110,73)",
     "h2_index_text": "#ffffff",
     "h3_color": "#333",
+    "h4_color": "#555",
     "cover_label": "AI 实践观察",
     "footer": "",
     "ending_lines": [
