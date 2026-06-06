@@ -31,8 +31,25 @@ _ARTICLE_RAW_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<style>
+/* 代码块浏览器端预览样式（微信平台自有 code-snippet CSS 白名单，此 style 仅用于浏览器预览） */
+.code-snippet__fix{position:relative;margin:12px 0 18px;border-radius:6px;overflow:hidden;font-size:13px;line-height:1.6}
+.code-snippet__fix .code-snippet__js{font-family:'SF Mono','Fira Code','Consolas','Menlo',monospace}
+.code-snippet__line-index{position:absolute;top:0;left:0;width:40px;padding:12px 0;margin:0;list-style:none;text-align:right;background:#2b3137;color:#636d83;font-size:12px;line-height:1.6;border-right:1px solid #3a3f47;box-sizing:border-box}
+.code-snippet__line-index li{padding:0 8px 0 0}
+pre.code-snippet__js{margin:0;padding:12px 12px 12px 52px;background:#282c34;color:#abb2bf;overflow-x:auto;white-space:pre}
+pre.code-snippet__js code{display:block;font-family:inherit}
+.code-snippet__keyword{color:#c678dd;font-weight:bold}
+.code-snippet__built_in{color:#e5c07b}
+.code-snippet__string{color:#98c379}
+.code-snippet__number{color:#d19a66}
+.code-snippet__comment{color:#5c6370;font-style:italic}
+.code-snippet__title{color:#61afef}
+.code-snippet__subst{color:#56b6c2}
+</style>
 </head>
-<body style="margin:0;padding:20px 16px;background:__BG__;font-family:__FONT_FAMILY__;text-indent:0">
+<body style="margin:0;padding:0;font-family:__FONT_FAMILY__;text-indent:0">
+<section style="background:__BG__;padding:20px 16px">
 
 <!-- 封面 -->
 <section style="background:__HERO_BG__;padding:28px 20px 22px;margin:0 0 24px 0;border-top:4px solid __RULE__">
@@ -49,6 +66,7 @@ __FOOTER_SECTION__
 
 __ENDING_SECTION__
 
+</section>
 </body>
 </html>"""
 
@@ -866,6 +884,7 @@ ARTICLE_DEFAULTS = {
 ARTICLE_THEMES = {
     "nostalgic": {
         "bg": "#f6f1e7",
+        "content_bg": "#f6f1e7",
         "text": "rgb(85,85,85)",
         "accent": "#3c2415",
         "hero_bg": "#3c2415",
@@ -1112,6 +1131,7 @@ def strip_frontmatter(md_text):
 def main():
     args = sys.argv[1:]
     config_path = None
+    no_title = True  # 默认去除标题块
 
     i = 0
     while i < len(args):
@@ -1119,6 +1139,10 @@ def main():
             i += 1
             if i < len(args):
                 config_path = args[i]
+        elif args[i] == '--no-title':
+            no_title = True
+        elif args[i] == '--with-title':
+            no_title = False
         else:
             break
         i += 1
@@ -1148,6 +1172,8 @@ def main():
     s = load_article_style_config(config_path=config_path)
 
     data = parse_article(md_text)
+    if no_title:
+        data['title'] = ""
     html = generate_html(data, s)
     print(f"生成成功（文章模式）: {output_file}")
     print(f"   标题: {data['title']}")

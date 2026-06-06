@@ -641,6 +641,16 @@ mukun_md_push/
 
 ## 📋 修改说明
 
+### 2026-06-06
+
+- **修复微信公众号过滤 `<body>` 行内样式**：微信会过滤 `<body>` 标签上的 `style` 属性（包括 `background`），导致泛黄报纸风格等自定义背景色失效。将 `background:__BG__` 从 `<body>` 移到新包裹的 `<section>` 上，正文区域同步添加 `content_bg` 字段支持
+- **`nostalgic` 主题新增 `content_bg` 字段**：值为 `"#f6f1e7"`，确保正文区域泛黄底色完整
+- **新闻模式解析增强**：支持 `**加粗标题** 描述文字` 作为条目开头（日报格式），无需 `### ` 前缀即可识别为新闻条目
+- **新闻模式来源日期去重**：`render_item()` 新增检测来源文本是否已含 `YYYY-MM-DD` 日期，若已含则不再追加全局 meta 日期，避免渲染为 `来源：xxx | 2026-06-06 | 2026-06-06` 重复日期
+- **文章模式 / 新闻模式均默认去除标题块**：`no_title` 默认值改为 `True`，新增 `--no-title`（默认开启）/ `--with-title` 参数，`--with-title` 可恢复显示封面标题区
+- **修复 `push_daily.py` 未传递 `--config` 参数给子进程**：重构 `main()` 参数解析逻辑，统一消费全部已知参数（`--config`、`--no-title`、`--with-title`、`--news`、`--article`、`--update`、`--title`、`--cover`、`--digest`、`--media-id`），避免参数遗漏或重复消费
+- **修复 `md2wechat_html.py` 未透传 `--no-title`/`--with-title`**：新增 `pass_through` 列表，将标题块开关正确传递给 `md2article_html.py`/`md2news_html.py`
+
 ### 2026-06-04
 
 - **新增 3 种文章模式预设样式**：在原有 3 种（默认/泛黄怀旧/科技蓝紫）基础上新增清爽专栏、内容增长、蓝图科技，预设总数从 3 种扩展为 6 种。每个预设对应 `references/` 下独立的 YAML 配置文件
