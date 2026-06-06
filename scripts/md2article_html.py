@@ -425,15 +425,48 @@ def format_text(text, s):
     return text
 
 
+def _split_table_row(row):
+    """拆分表格行，保护行内代码（`...`）中的管道符不被误拆"""
+    # 记录所有反引号对的位置
+    code_spans = []
+    i = 0
+    while i < len(row):
+        if row[i] == '`':
+            j = row.find('`', i + 1)
+            if j != -1:
+                code_spans.append((i, j))
+                i = j + 1
+                continue
+        i += 1
+
+    # 检查每个 | 是否在反引号对内
+    def _is_in_code(pos):
+        for a, b in code_spans:
+            if a < pos < b:
+                return True
+        return False
+
+    # 用占位符替换反引号内的管道符
+    PLACEHOLDER = '\x00PIPE\x00'
+    chars = list(row)
+    for pos in range(len(chars)):
+        if chars[pos] == '|' and _is_in_code(pos):
+            chars[pos] = PLACEHOLDER
+
+    # 拆分后还原管道符
+    return [c.strip().replace(PLACEHOLDER, '|')
+            for c in ''.join(chars).split('|')[1:-1]]
+
+
 def render_table(rows, s):
     """渲染表格为微信兼容 HTML"""
     if not rows:
         return ""
 
-    headers = [c.strip() for c in rows[0].split('|')[1:-1]]
+    headers = _split_table_row(rows[0])
     data_rows = []
     for row in rows[1:]:
-        cells = [c.strip() for c in row.split('|')[1:-1]]
+        cells = _split_table_row(row)
         if cells:
             data_rows.append(cells)
 
@@ -813,8 +846,9 @@ def generate_html(data, s):
             h2_index += 1
             content_parts.append(render_h2(text, s, h2_index))
         elif btype == "heading" and block["level"] == 3:
+            h3_color = s.get("h3_color", "#333")
             content_parts.append(
-                f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:#333;line-height:1.5">'
+                f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:{h3_color};line-height:1.5">'
                 f'{format_text(escape_html(text), s)}</p>'
             )
         elif btype == "blockquote":
@@ -869,6 +903,7 @@ ARTICLE_DEFAULTS = {
     "h2_badge_text": "#ffffff",
     "h2_index_bg": "rgb(198,110,73)",
     "h2_index_text": "#ffffff",
+    "h3_color": "#333",
     "cover_label": "AI 实践观察",
     "footer": "",
     "ending_lines": [
