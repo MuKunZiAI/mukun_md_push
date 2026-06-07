@@ -66,6 +66,22 @@ _NEWS_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<style>
+/* 代码块浏览器端预览样式（微信平台自有 code-snippet CSS 白名单，此 style 仅用于浏览器预览） */
+.code-snippet__fix{{position:relative;margin:12px 0 18px;border-radius:6px;overflow:hidden;font-size:13px;line-height:1.6}}
+.code-snippet__fix .code-snippet__js{{font-family:'SF Mono','Fira Code','Consolas','Menlo',monospace}}
+.code-snippet__line-index{{position:absolute;top:0;left:0;width:40px;padding:12px 0;margin:0;list-style:none;text-align:right;background:#2b3137;color:#636d83;font-size:12px;line-height:1.6;border-right:1px solid #3a3f47;box-sizing:border-box}}
+.code-snippet__line-index li{{padding:0 8px 0 0}}
+pre.code-snippet__js{{margin:0;padding:12px 12px 12px 52px;background:#282c34;color:#abb2bf;overflow-x:auto;white-space:pre}}
+pre.code-snippet__js code{{display:block;font-family:inherit}}
+.code-snippet__keyword{{color:#c678dd;font-weight:bold}}
+.code-snippet__built_in{{color:#e5c07b}}
+.code-snippet__string{{color:#98c379}}
+.code-snippet__number{{color:#d19a66}}
+.code-snippet__comment{{color:#5c6370;font-style:italic}}
+.code-snippet__title{{color:#61afef}}
+.code-snippet__subst{{color:#56b6c2}}
+</style>
 </head>
 <body style="margin:0;padding:24px 16px;background:__BG__;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-indent:0">
 
@@ -165,6 +181,26 @@ def parse_markdown(md_text, source_prefixes=None):
             current_item = {
                 "title": line[4:].strip(),
                 "description": "",
+                "source": "",
+                "table": None
+            }
+            i += 1
+            continue
+
+        # 支持 **加粗** 作为条目开头（日报格式）
+        if line.startswith('**') and current_section:
+            if current_item:
+                current_items.append(current_item)
+            m = re.match(r'\*\*(.+?)\*\*\s*(.*)', line)
+            if m:
+                item_title = m.group(1)
+                item_desc = m.group(2).lstrip('。')
+            else:
+                item_title = line.strip('*')
+                item_desc = ""
+            current_item = {
+                "title": item_title,
+                "description": item_desc,
                 "source": "",
                 "table": None
             }
@@ -355,7 +391,12 @@ def render_item(item, color, s, date=""):
     if item["source"]:
         source_label = s.get("source_label", "来源：")
         source_html = format_text(item["source"], s)
-        date_suffix = f" | {date}" if date else ""
+        # 来源文本已含日期，则不再追加全局日期，避免重复
+        source_has_date = bool(re.search(r'\d{4}-\d{2}-\d{2}', item["source"]))
+        if source_has_date:
+            date_suffix = ""
+        else:
+            date_suffix = f" | {date}" if date else ""
         html += f'  <p style="margin:8px 0 0 0;font-size:11px;color:{s["caption"]};letter-spacing:0.5px">{source_label}{source_html}{date_suffix}</p>\n'
 
     html += '</section>\n'
@@ -611,6 +652,7 @@ def strip_frontmatter(md_text):
 def main():
     args = sys.argv[1:]
     config_path = None
+    no_title = True  # 默认去除标题块
 
     i = 0
     while i < len(args):
@@ -618,6 +660,10 @@ def main():
             i += 1
             if i < len(args):
                 config_path = args[i]
+        elif args[i] == '--no-title':
+            no_title = True
+        elif args[i] == '--with-title':
+            no_title = False
         else:
             break
         i += 1
@@ -647,6 +693,8 @@ def main():
     s = load_news_style_config(config_path=config_path)
 
     data = parse_markdown(md_text, source_prefixes=s.get("source_prefixes", ["来源：", "来源:"]))
+    if no_title:
+        data['title'] = ""
     html = generate_html(data, s)
     print(f"生成成功（新闻模式）: {output_file}")
     print(f"   标题: {data['title']}")

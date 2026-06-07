@@ -747,6 +747,8 @@ def main():
     article_mode = True  # 默认文章模式
     update_mode = False
     update_media_id = None
+    no_title = True  # 默认去除标题块
+    config_path = None
 
     # 识别模式参数
     if "--news" in args:
@@ -755,6 +757,19 @@ def main():
     if "--article" in args:
         article_mode = True
         args = [a for a in args if a != "--article"]
+    if "--no-title" in args:
+        no_title = True
+        args = [a for a in args if a != "--no-title"]
+    if "--with-title" in args:
+        no_title = False
+        args = [a for a in args if a != "--with-title"]
+    # 解析 --config 参数
+    if "--config" in args:
+        config_idx = args.index("--config")
+        if config_idx + 1 < len(args):
+            config_path = args[config_idx + 1]
+            args.pop(config_idx)  # 移除 --config
+            args.pop(config_idx)  # 移除路径值
     if "--update" in args:
         update_mode = True
         update_idx = args.index("--update")
@@ -809,14 +824,24 @@ def main():
     if article_mode:
         html_file = f"{base}_article_wechat.html"
         mode_label = "文章模式"
-        cmd = [sys.executable, MD2WECHAT_SCRIPT, "--article", md_file, html_file]
+        cmd = [sys.executable, MD2WECHAT_SCRIPT]
+        if config_path:
+            cmd.extend(["--config", config_path])
+        if not no_title:  # 用户显式传递了 --with-title
+            cmd.append("--with-title")
+        cmd.extend(["--article", md_file, html_file])
     else:
         html_file = f"{base}_news_wechat.html"
         mode_label = "新闻模式"
-        cmd = [sys.executable, MD2WECHAT_SCRIPT, "--news", md_file, html_file]
+        cmd = [sys.executable, MD2WECHAT_SCRIPT]
+        if config_path:
+            cmd.extend(["--config", config_path])
+        if not no_title:  # 用户显式传递了 --with-title
+            cmd.append("--with-title")
+        cmd.extend(["--news", md_file, html_file])
 
     print(f"步骤 1: Markdown → 微信兼容 HTML（{mode_label}）")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if result.returncode != 0:
         print(f"ERROR: HTML 生成失败:\n{result.stderr}")
         sys.exit(1)

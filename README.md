@@ -3,6 +3,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.6+-green.svg" alt="Python 3.6+" /></a>
   <img src="https://img.shields.io/badge/WeChat-公众号推送-07C160?logo=wechat&logoColor=white" alt="WeChat" />
+  <img src="https://img.shields.io/badge/掘金-草稿推送-1E80FF?logo=juejin&logoColor=white" alt="掘金" />
   <br/>
   <img src="https://img.shields.io/badge/WorkBuddy-支持-FF6B35?style=flat-square" alt="WorkBuddy" />
   <img src="https://img.shields.io/badge/Claude_Code-支持-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude Code" />
@@ -12,13 +13,14 @@
 </p>
 <br/>
 
-> 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可一键推送到公众号草稿箱。
+> 将 Markdown 文件转换为符合微信公众号规范的 HTML 文件，并可一键推送到公众号草稿箱。支持推送到稀土掘金草稿箱（图片自动上传 + MD5 缓存）。
 
 ## ✨ 功能特性
 
 - 📰 **两种转换模式**：文章模式（默认，长文叙事，配色可配置）和新闻模式（板块化日报，需明确指定 `--news`）
 - 🎨 **微信样式兼容**：所有 CSS 内联，使用 `<section>` 替代 `<div>`，规避微信渲染限制
 - 📤 **草稿箱推送**：转换后直接上传到微信公众号草稿箱，手动修改原创等信息后，即可发布
+- 🪶 **掘金草稿箱推送**：Markdown 原文直接推送掘金，自动上传本地图片到掘金 CDN（ImageX 5 步流程 + AWS SigV4 签名），基于 MD5 缓存复用已上传图片
 - 🖼️ **图片自动上传**：自动解析 Markdown 中的本地图片引用，上传到微信永久素材库并替换为 CDN URL
 - 💾 **素材智能缓存**：图片 + 封面图基于文件内容 MD5 缓存到 config.yaml，同一张图片不会重复上传
 - 📝 **Frontmatter 支持**：可在 Markdown 文件顶部声明标题和摘要
@@ -140,40 +142,70 @@ rm -rf /tmp/mukun_md_push
 > "帮我把这篇 AI 周报转成新闻模式的微信公众号 HTML"
 
 <p align="center">
-  <img src="assets/news.png" alt="新闻模式" width="480" />
+  <img src="assets/news.JPG" alt="新闻模式" width="480" />
 </p>
 
-### 文章模式（默认风格）
+### 文章模式（默认）
 
 > "把这篇文章转成微信公众号 HTML"
 
-白底灰字，适合技术实践与深度文章：
+白底灰字 + 棕橘胶囊标题，适合技术实践与深度文章：
 
 <p align="center">
-  <img src="assets/article_default.png" alt="文章模式-默认" width="480" />
+  <img src="assets/article_default.JPG" alt="文章模式-默认" width="480" />
 </p>
 
 ### 文章模式（泛黄怀旧）
 
 > "用泛黄怀旧风格把这篇文章转成微信公众号 HTML"
 
-古卷泛黄底色 + 古铜暖棕强调色，适合历史文化类叙事长文：
+古卷泛黄底色 + 深棕胶囊标题，适合历史文化类叙事长文：
 
 <p align="center">
-  <img src="assets/article_nostalgic.png" alt="文章模式-泛黄怀旧" width="480" />
+  <img src="assets/article_nostalgic.JPG" alt="文章模式-泛黄怀旧" width="480" />
 </p>
 
 ### 文章模式（科技蓝紫）
 
 > "用科技蓝紫风格把这篇文章转成微信公众号 HTML"
 
-深邃灰蓝背景 + 蓝紫渐变强调色，适合 AI 科技、技术前沿文章：
+白底 + 蓝紫胶囊标题 + 深蓝封面，适合 AI 科技、技术前沿文章：
 
 <p align="center">
-  <img src="assets/article_modern.png" alt="文章模式-科技蓝紫" width="480" />
+  <img src="assets/article_modern.JPG" alt="文章模式-科技蓝紫" width="480" />
 </p>
 
-> 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，自定义配色配置文件参见 [examples/config_example.yaml](examples/config_example.yaml)。
+### 文章模式（青绿引号）
+
+> "用青绿引号风格把这篇文章转成微信公众号 HTML"
+
+米白底 + 大 Q 引号包裹标题 + 青绿下划线，适合文艺随笔、杂志专栏：
+
+<p align="center">
+  <img src="assets/article_journal.JPG" alt="文章模式-青绿引号" width="480" />
+</p>
+
+### 文章模式（角标绿条）
+
+> "用角标绿条风格把这篇文章转成微信公众号 HTML"
+
+白底 + 黄色编号角标 + 绿色标签块标题，适合清单拆解、运营资讯：
+
+<p align="center">
+  <img src="assets/article_growth.JPG" alt="文章模式-角标绿条" width="480" />
+</p>
+
+### 文章模式（中轴蓝卡）
+
+> "用中轴蓝卡风格把这篇文章转成微信公众号 HTML"
+
+冷灰底 + 中轴蓝色编号卡标题 + 两侧横线，适合产品文档、技术手册：
+
+<p align="center">
+  <img src="assets/article_blueprint.JPG" alt="文章模式-中轴蓝卡" width="480" />
+</p>
+
+> 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，6 种预设配色配置文件参见 [references/](references/) 目录。
 
 ### 📝 支持的 Markdown 格式
 
@@ -351,6 +383,13 @@ SqlNode node = parser.parseQuery();
 | `title_font_size` | `22px` | 文章主标题 |
 | `text_font_size` | `16px` | 正文文字 |
 | `h2_font_size` | `18px` | H2 标题 |
+| `h2_style` | `pill` | H2 样式：`pill` / `quote_line` / `badge_block` / `center_card` |
+| `h2_badge_bg` | `#f7b731` | `badge_block` 编号徽章背景色 |
+| `h2_badge_text` | `#ffffff` | `badge_block` 编号徽章文字色 |
+| `h2_index_bg` | `accent` | `center_card` 编号卡背景色 |
+| `h2_index_text` | `#ffffff` | `center_card` 编号卡文字色 |
+| `font_family` | 系统中文字体栈 | 页面字体栈 |
+| `content_bg` | `transparent` | 正文区背景色 |
 | `cover_label` | `AI 实践观察` | 封面副标题 |
 | `footer` | `""` | 底部署名（空字符串不显示） |
 | `ending_lines` | 5 行默认尾栏 | 文末尾栏，`[]` 关闭，支持 HTML 标签 |
@@ -359,23 +398,27 @@ SqlNode node = parser.parseQuery();
 
 #### 🎨 预设样式速查（自然语言 → 配置文件）
 
-文章模式内置 3 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
+文章模式内置 6 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
 
 | 预设 | 配置文件 | 视觉特征 | 自然语言触发词 |
 |------|---------|---------|--------------|
-| 默认 | `references/article_default.yaml` | 白底灰字 + 棕色标签标题 | "默认样式"、"白色"、"白底"、"常规" |
-| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 古铜暖棕强调色 | "怀旧"、"泛黄"、"古风"、"历史"、"报纸"、"典籍" |
-| 科技蓝紫 | `references/article_modern.yaml` | 冷色调蓝紫渐变 + 深色封面 | "科技"、"蓝紫"、"现代"、"AI"、"炫酷" |
+| 默认 | `references/article_default.yaml` | 白底灰字 + 棕橘胶囊标题 | "默认样式"、"白色"、"白底"、"常规"、"简洁"、"干净" |
+| 泛黄怀旧 | `references/article_nostalgic.yaml` | 古卷泛黄底色 + 深棕胶囊标题 | "怀旧"、"泛黄"、"古风"、"古卷"、"黄底"、"暖黄"、"典籍" |
+| 科技蓝紫 | `references/article_modern.yaml` | 白底 + 蓝紫胶囊标题 + 深蓝封面 | "科技"、"蓝紫"、"蓝紫渐变"、"AI"、"技术"、"现代"、"前沿" |
+| 青绿引号 | `references/article_journal.yaml` | 米白底 + 青绿引号线 H2（大 Q + 引号包裹标题） | "青绿"、"青绿引号"、"引号标题"、"文艺"、"杂志"、"专栏"、"清爽" |
+| 角标绿条 | `references/article_growth.yaml` | 白底 + 黄色编号角标 + 绿色标签块 H2 | "角标"、"角标绿条"、"编号角标"、"badge"、"清单"、"步骤"、"运营" |
+| 中轴蓝卡 | `references/article_blueprint.yaml` | 冷灰底 + 中轴蓝色编号卡 H2（居中编号 + 两侧横线） | "中轴"、"中轴蓝卡"、"编号卡"、"center"、"灰底"、"冷灰"、"产品文档" |
 
 ```bash
 # 直接用 --config 引用预设
 python3 scripts/md2wechat_html.py --config references/article_nostalgic.yaml story.md
 python3 scripts/push_daily.py --config references/article_modern.yaml story.md
+python3 scripts/md2wechat_html.py --config references/article_journal.yaml story.md
 ```
 
 #### 🔧 如何新增自定义配置
 
-内置的 3 种预设样式不能满足需求时，有两种方式新增自定义配置：
+内置的 6 种预设样式不能满足需求时，有两种方式新增自定义配置：
 
 **方式一：修改全局配置文件**（影响所有未指定 `--config` 的文章模式推送）
 
@@ -489,6 +532,60 @@ python3 scripts/push_daily.py --news article.md
 python3 scripts/push_daily.py story.md --title "自定义标题" --cover ./封面图.png --digest "自定义摘要"
 ```
 
+### 推送草稿箱（稀土掘金）
+
+推送前需在 `~/.md_push_wechat/config.yaml` 中配置掘金 Cookie：
+
+```yaml
+juejin:
+  cookie: "your_juejin_cookie"           # 必填，登录 juejin.cn → F12 → Cookies
+  category_id: "6809637773935378440"     # 可选默认分类
+  tag_ids: "7467857238494019610"         # 可选默认标签
+```
+
+#### 图片上传到掘金 CDN
+
+推送时自动扫描 Markdown 中的本地图片引用，通过掘金 ImageX 服务上传。完整 5 步流程：
+
+| 步骤 | 接口 | 说明 |
+|------|------|------|
+| 1. gen_token | `GET /imagex/v2/gen_token` | 获取 STS 临时凭证（AccessKeyId/SecretAccessKey/SessionToken） |
+| 2. ApplyImageUpload | `GET imagex.bytedanceapi.com/?Action=ApplyImageUpload` | 获取上传地址，需要 AWS SigV4 签名 |
+| 3. 上传二进制 | `POST tos-d-x-lf.douyin.com/{store_uri}` | 上传文件，带 Content-CRC32 校验 |
+| 4. CommitImageUpload | `POST ?Action=CommitImageUpload&SessionKey=xxx` | 确认上传，SigV4 签名 |
+| 5. get_img_url | `GET /imagex/v2/get_img_url` | 获取 CDN URL（`https://p1-juejin.byteimg.com/...`） |
+
+图片基于文件内容 MD5 缓存到 `config.yaml` 的 `image_cache.juejin` 段，同一张图永久复用：
+
+```yaml
+image_cache:
+  juejin:
+    <file_hash>: "<CDN URL>"
+```
+
+```bash
+# 新建草稿
+python3 scripts/push_juejin.py story.md --title "文章标题" --digest "50-100字摘要"
+
+# 更新已有草稿
+python3 scripts/push_juejin.py story.md --update DRAFT_ID
+
+# 查询可用标签
+python3 scripts/push_juejin.py --query-tags "AI"
+
+# 指定分类和标签
+python3 scripts/push_juejin.py story.md --title "标题" --digest "摘要" \
+  --category "后端" --tags "6809640445233070098,6809640408797167623"
+```
+
+掘金分类 ID 速查：
+
+| 分类 | ID | 分类 | ID |
+|------|----|------|----|
+| 后端 | `6809637769959178254` | 前端 | `6809637767543259144` |
+| AI | `6809637773935378440` | 开发工具 | `6809637771511070734` |
+| Android | `6809635626879549454` | iOS | `6809635626661445640` |
+
 ## 📁 目录结构
 
 ```
@@ -503,24 +600,33 @@ mukun_md_push/
 │   ├── md2news_html.py          # 新闻模式转换器
 │   ├── md2article_html.py       # 文章模式转换器
 │   └── push_daily.py            # 转换 + 推送草稿箱脚本
-├── references/                  # 文章模式预设样式（自然语言 → 配置文件）
-│   ├── article_default.yaml     # 默认样式（白底灰字）
-│   ├── article_nostalgic.yaml   # 泛黄怀旧样式（古卷暖棕）
-│   └── article_modern.yaml      # 科技蓝紫样式（冷色调）
+├── references/                  # 文章模式 6 种预设样式（自然语言 → 配置文件）
+│   ├── article_default.yaml     # 默认（白底灰字 + 棕橘胶囊标题）
+│   ├── article_nostalgic.yaml   # 泛黄怀旧（古卷泛黄 + 深棕胶囊标题）
+│   ├── article_modern.yaml      # 科技蓝紫（白底 + 蓝紫胶囊标题）
+│   ├── article_journal.yaml     # 青绿引号（米白底 + 大 Q 引号线标题）
+│   ├── article_growth.yaml      # 角标绿条（白底 + 黄角标 + 绿标签块）
+│   └── article_blueprint.yaml   # 中轴蓝卡（冷灰底 + 中轴蓝色编号卡）
 ├── examples/
 │   ├── config_example.yaml              # 完整配置示例（news + article 所有可配置项）
 │   ├── default/                         # 默认配色示例（源文件 + 生成 HTML）
 │   │   ├── news_example.md                   # 新闻模式源文件
 │   │   ├── news_example.html                 # 新闻模式 HTML（生成，默认报纸配色）
 │   │   ├── article_example.md                # 文章模式源文件（AI 技术实践）
-│   │   ├── article_example.html              # 文章模式 HTML（生成，默认 AI 风格配色）
-│   ├── nostalgic/                     # 泛黄怀旧配色方案（自含源文件+配置+HTML）
+│   │   ├── article_example.html              # 文章模式 HTML（生成，默认配色）
+│   ├── nostalgic/                     # 泛黄怀旧配色方案
 │   │   ├── config_nostalgic.yaml
 │   │   ├── article_nostalgic_example.md      # 文章模式源文件（成语典故）
 │   │   └── article_nostalgic_example.html    # 文章模式 HTML（生成，怀旧配色）
-│   └── modern/                        # 现代化蓝紫配色方案
-│       ├── config_modern.yaml
-│       └── article_modern_example.html       # 文章模式 HTML（生成，使用 default/article_example.md 源文件）
+│   ├── modern/                        # 科技蓝紫配色方案
+│   │   ├── config_modern.yaml
+│   │   └── article_modern_example.html       # 文章模式 HTML（生成，蓝紫配色）
+│   ├── journal/                       # 青绿引号配色方案
+│   │   └── article_journal_example.html      # 文章模式 HTML（生成，青绿配色）
+│   ├── growth/                        # 角标绿条配色方案
+│   │   └── article_growth_example.html       # 文章模式 HTML（生成，角标配色）
+│   └── blueprint/                     # 中轴蓝卡配色方案
+│       └── article_blueprint_example.html    # 文章模式 HTML（生成，蓝卡配色）
 ├── LICENSE
 └── README.md
 ```
@@ -534,6 +640,46 @@ mukun_md_push/
 
 
 ## 📋 修改说明
+
+### 2026-06-06
+
+- **修复微信公众号过滤 `<body>` 行内样式**：微信会过滤 `<body>` 标签上的 `style` 属性（包括 `background`），导致泛黄报纸风格等自定义背景色失效。将 `background:__BG__` 从 `<body>` 移到新包裹的 `<section>` 上，正文区域同步添加 `content_bg` 字段支持
+- **`nostalgic` 主题新增 `content_bg` 字段**：值为 `"#f6f1e7"`，确保正文区域泛黄底色完整
+- **新闻模式解析增强**：支持 `**加粗标题** 描述文字` 作为条目开头（日报格式），无需 `### ` 前缀即可识别为新闻条目
+- **新闻模式来源日期去重**：`render_item()` 新增检测来源文本是否已含 `YYYY-MM-DD` 日期，若已含则不再追加全局 meta 日期，避免渲染为 `来源：xxx | 2026-06-06 | 2026-06-06` 重复日期
+- **文章模式 / 新闻模式均默认去除标题块**：`no_title` 默认值改为 `True`，新增 `--no-title`（默认开启）/ `--with-title` 参数，`--with-title` 可恢复显示封面标题区
+- **修复 `push_daily.py` 未传递 `--config` 参数给子进程**：重构 `main()` 参数解析逻辑，统一消费全部已知参数（`--config`、`--no-title`、`--with-title`、`--news`、`--article`、`--update`、`--title`、`--cover`、`--digest`、`--media-id`），避免参数遗漏或重复消费
+- **修复 `md2wechat_html.py` 未透传 `--no-title`/`--with-title`**：新增 `pass_through` 列表，将标题块开关正确传递给 `md2article_html.py`/`md2news_html.py`
+
+### 2026-06-04
+
+- **新增 3 种文章模式预设样式**：在原有 3 种（默认/泛黄怀旧/科技蓝紫）基础上新增清爽专栏、内容增长、蓝图科技，预设总数从 3 种扩展为 6 种。每个预设对应 `references/` 下独立的 YAML 配置文件
+- **后三种预设重命名为具象描述型名称**：
+  - 清爽专栏 → **青绿引号**（颜色锚点"青绿" + 视觉锚点"大 Q 引号包裹标题"）
+  - 内容增长 → **角标绿条**（两个视觉锚点"黄色数字角标" + "绿色标签块"）
+  - 蓝图科技 → **中轴蓝卡**（结构锚点"居中蓝色编号卡" + "两侧横线"）
+- **视觉特征描述更新**：六种预设的描述均改为对应视觉锚点，让用户听名字就能在脑海中浮现画面
+- **自然语言触发词全面优化**：消除关键词冲突与歧义
+  - "绿" 同时命中两种 → 拆分为"青绿"（青绿引号）和"角标绿条""绿底封面"（角标绿条）
+  - "科技"被蓝图和科技蓝紫共享 → 蓝图改用"产品文档""技术手册"；科技蓝紫保留"科技""技术"
+  - "编号"/"编号卡" 同时命中两种 → 拆分为"角标编号"（角标绿条）和"中轴编号""编号卡"（中轴蓝卡）
+  - "深色"误导（科技蓝紫是白底不是深色模式）→ 改为"深蓝封面"
+  - "报纸"误导（怀旧不是报纸风格，报纸风格在新闻模式）→ 移除，新增"古卷""暖黄"
+  - "炫酷""quote""复盘""普通"等太泛或英文依赖过高的词 → 移除，改用更精准的中文描述
+  - 每类新增底色系触发词（白底/黄底/暖黄/灰底/冷灰/蓝灰底），提升匹配精准度
+- **SKILL.md、README.md 预设表格和匹配规则同步更新**：预设数量从"3 种"修正为"6 种"，新增 `references/article_journal.yaml` 的命令示例
+- **6 个 YAML 配置文件注释更新**：注释中的样式名称、视觉描述、适用场景、触发词全部同步为最新版本
+- **示例 HTML 全部重新生成**：`examples/` 下 4 个原有示例 HTML（default 文章/新闻、modern、nostalgic）用最新脚本和配置重新生成，确保截图与实际效果一致
+### 2026-05-30
+
+- **掘金图片上传完整重写**：从 HAR 文件逆向掘金编辑器图片粘贴行为，完整还原 ImageX 5 步上传流程（gen_token → ApplyImageUpload → 上传二进制 → CommitImageUpload → get_img_url）
+- **AWS SigV4 签名实现**：新增 `_sigv4_auth` / `_sigv4_sign` 签名函数，修复 ImageX API 的 `InvalidAuthorization` 错误。参数排序使用 `sorted()` 确保 AWS 要求的字母顺序，避免 `urllib.parse.urlencode(dict)` 顺序不稳定的问题
+- **ServiceId 修正**：从 `k3u1fbpfcp` 改为 `73owjymdk6`（HAR 逆向确认的正确服务 ID）
+- **图片 MD5 缓存（掘金）**：参照微信图片缓存模式，新增 `image_cache.juejin` 段。基于文件内容 MD5 缓存 CDN URL，同一张图永久复用，避免重复上传
+- **mark_content 图片引用修复**：上传后替换为完整 CDN URL（`https://p1-juejin.byteimg.com/...`）而非 store_uri，确保草稿中图片正常显示
+- **gen_token 接口升级**：API 版本从 v1 升级为 v2，新增 `aid`/`uuid`/`client` 参数，Cookie 必传
+- **草稿 API 字段补全**：新增 `is_gfw`、`is_english`、`is_original`、`pics` 字段，匹配掘金编辑器实际请求格式
+- **文档更新**：README 新增掘金推送章节（ImageX 上传流程、缓存机制、分类速查、使用示例），目录结构加入 `push_juejin.py`
 
 ### 2026-05-28
 
