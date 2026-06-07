@@ -1,18 +1,18 @@
 name: Publish to ClawHub
 
 on:
-  # PR 时做 dry-run 验证，不真正发布
   pull_request:
-
-  # 手动触发真正发布
   workflow_dispatch:
     inputs:
-      version:
-        description: "版本号 (semver，如 1.0.0)"
+      bump:
+        description: "版本递增类型"
         required: true
-        default: "1.0.0"
-
-  # 推送 tag 时自动发布（推荐方式）
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
   push:
     tags:
       - "v*"
@@ -22,31 +22,34 @@ permissions:
   id-token: write
 
 jobs:
-  # PR 时：dry-run 验证
   dry-run:
     if: github.event_name == 'pull_request'
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    # ✅ 修复：从 @v1 改为 @v0.20.0（或 @main）
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v0.20.0
     with:
       owner: ysdhb
       dry_run: true
-      skill_path: .    # 根目录就是 skill 目录（有 SKILL.md）
+      skill_path: .
 
-  # 手动触发或 tag 推送时：真正发布
   publish:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    # ✅ 修复：从 @v1 改为 @v0.20.0（或 @main）
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v0.20.0
     with:
       owner: ysdhb
       dry_run: false
       skill_path: .
-      # tag 推送时自动提取版本号，手动触发时用输入的版本号
-      version: >
-        ${{ 
-          github.event_name == 'push' 
-            && github.ref_name 
-            || github.event.inputs.version 
+      bump: >
+        ${{
+          github.event_name == 'push'
+            && (
+              contains(github.ref_name, '.0.0') && 'major'
+              || contains(github.ref_name, '.0') && 'minor'
+              || 'patch'
+            )
+            || github.event.inputs.bump
         }}
     secrets:
       clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
