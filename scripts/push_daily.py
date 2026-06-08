@@ -620,7 +620,10 @@ def _push_single_draft(access_token, title, html_content, thumb_media_id, cover_
     """推送单篇草稿"""
     # 生成摘要
     if not digest:
-        plain_text = re.sub(r"<[^>]+>", "", html_content)
+        # 先移除 <style> 和 <script> 块，再去除 HTML 标签
+        clean_html = re.sub(r"<style[^>]*>[\s\S]*?</style>", "", html_content, flags=re.IGNORECASE)
+        clean_html = re.sub(r"<script[^>]*>[\s\S]*?</script>", "", clean_html, flags=re.IGNORECASE)
+        plain_text = re.sub(r"<[^>]+>", "", clean_html)
         plain_text = re.sub(r"\s+", " ", plain_text).strip()
         digest = plain_text[:120] if len(plain_text) > 120 else plain_text
 
@@ -662,7 +665,10 @@ def update_draft(access_token, media_id, title, html_content, thumb_media_id, co
     """
     # 生成摘要
     if not digest:
-        plain_text = re.sub(r"<[^>]+>", "", html_content)
+        # 先移除 <style> 和 <script> 块，再去除 HTML 标签
+        clean_html = re.sub(r"<style[^>]*>[\s\S]*?</style>", "", html_content, flags=re.IGNORECASE)
+        clean_html = re.sub(r"<script[^>]*>[\s\S]*?</script>", "", clean_html, flags=re.IGNORECASE)
+        plain_text = re.sub(r"<[^>]+>", "", clean_html)
         plain_text = re.sub(r"\s+", " ", plain_text).strip()
         digest = plain_text[:120] if len(plain_text) > 120 else plain_text
 
@@ -725,8 +731,17 @@ def extract_frontmatter(md_file):
                     title = line[6:].strip().strip("\"'")
                 elif line.startswith("digest:"):
                     digest = line[7:].strip().strip("\"'")
-            if title:
-                return title, digest
+            # digest 独立于 title 返回，不互相依赖
+            if not title:
+                # 从 # 标题行提取
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith("# "):
+                        title = line[2:].strip()
+                        break
+            if not title:
+                title = "未命名日报"
+            return title, digest
 
     # 回退：直接从 # 标题行提取
     for line in content.splitlines():
