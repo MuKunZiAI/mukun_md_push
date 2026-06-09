@@ -77,12 +77,28 @@ def _build_article_html(s, title, content, footer_section="", ending_section="")
     hero_title_color = s.get("hero_title_color", "#faf7f0")
     text_color = s.get("text", s.get("dark", "rgb(85,85,85)"))
     rule = s.get("rule", "#c4a882")
+    hero_style = s.get("hero_style", "default")
 
     # 如果 markdown 没有 # 一级标题，去掉空白封面区
     if not title:
         t = re.sub(
             r'<!-- 封面 -->.*?</section>\s*\n',
             '', t, flags=re.DOTALL
+        )
+    # minimal 模式：替换默认封面区为极简标题（无顶条、无 label，左对齐黑色大标题）
+    elif hero_style == "minimal":
+        title_size = s["title_font_size"]
+        minimal_hero = (
+            f'<!-- 封面 -->\n'
+            f'<section style="margin:0 0 20px 0;padding:6px 0 14px 0">\n'
+            f'  <h1 style="margin:0;font-size:{title_size};font-weight:bold;color:{hero_title_color};'
+            f'line-height:1.4;text-align:left;border:none">{title}</h1>\n'
+            f'</section>'
+        )
+        t = re.sub(
+            r'<!-- 封面 -->.*?</section>',
+            lambda m: minimal_hero,
+            t, count=1, flags=re.DOTALL
         )
 
     for name, val in [
@@ -748,68 +764,18 @@ def render_h2(text, s, index):
     index_text = s.get("h2_index_text", "#ffffff")
     label = format_text(escape_html(text), s)
 
-    if style == "quote_line":
+    if style == "framed_pill":
+        # 紫绿学术风 H2：浅色底 + 主色文字 + 主色左粗边 + 圆角胶囊框
+        frame_bg = s.get("h2_frame_bg", "#f8f0fb")
+        frame_border = s.get("h2_frame_border", accent)
+        frame_border_width = s.get("h2_frame_border_width", "5px")
+        frame_radius = s.get("h2_frame_radius", "4px")
         return (
-            f'<section style="margin:30px 0 20px 0;text-align:center">'
-            f'<p style="margin:0 0 8px 0;font-size:56px;color:{accent};opacity:0.12;line-height:0.8;font-weight:bold">Q</p>'
-            f'<h2 style="margin:0;font-size:{h2_size};font-weight:bold;color:{accent};line-height:1.6;display:block;background:none;padding:0">'
-            f'“{label}”</h2>'
-            f'<p style="margin:10px auto 0 auto;width:62%;max-width:420px;border-top:3px solid {accent};height:0"></p>'
-            f'</section>'
-        )
-
-    if style == "badge_block":
-        return (
-            f'<section style="margin:30px 0 18px 0">'
-            f'<p style="margin:0;line-height:1;text-align:left">'
-            f'<span style="display:inline-block;vertical-align:top;background:{badge_bg};color:{badge_text};padding:10px 14px;border-radius:0 0 18px 18px;'
-            f'font-size:24px;font-weight:bold;letter-spacing:1px">{_h2_index_text(index)}</span>'
-            f'<span style="display:inline-block;vertical-align:top;margin-left:8px;background:{accent};color:#fff;padding:12px 16px;'
-            f'font-size:{h2_size};font-weight:bold;line-height:1.4">{label}</span>'
-            f'</p>'
-            f'<p style="margin:12px 0 0 0;border-top:3px solid {accent};height:0"></p>'
-            f'</section>'
-        )
-
-    if style == "center_card":
-        return (
-            f'<section style="margin:34px 0 24px 0;text-align:center">'
-            f'<p style="margin:0;line-height:1">'
-            f'<span style="display:inline-block;vertical-align:middle;width:34%;border-top:2px solid {rule};height:0"></span>'
-            f'<span style="display:inline-block;vertical-align:middle;margin:0 10px;background:{index_bg};color:{index_text};padding:9px 14px;'
-            f'font-size:24px;font-weight:bold;line-height:1;min-width:48px">{_h2_index_text(index)}</span>'
-            f'<span style="display:inline-block;vertical-align:middle;width:34%;border-top:2px solid {rule};height:0"></span>'
-            f'</p>'
-            f'<h2 style="margin:16px 0 0 0;font-size:{h2_size};font-weight:bold;color:{bold_color};line-height:1.5;display:block;background:none;padding:0">'
+            f'<h2 style="margin:24px 0 14px 0;padding:12px 14px;font-size:{h2_size};font-weight:bold;'
+            f'color:{accent};background:{frame_bg};border-left:{frame_border_width} solid {frame_border};'
+            f'border-radius:{frame_radius};line-height:1.6;display:block">'
             f'{label}</h2>'
-            f'</section>'
         )
-
-    # 默认胶囊样式（保持历史兼容）
-    return (
-        f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:{h2_size};font-weight:bold;color:#fff;'
-        f'background:{accent};text-align:center;display:block;'
-        f'width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
-        f'{label}</h2>'
-    )
-
-
-def _h2_index_text(index):
-    return f"{index:02d}"
-
-
-def render_h2(text, s, index):
-    """渲染 H2（支持多种样式）"""
-    style = s.get("h2_style", "pill")
-    accent = s.get("accent", "#333")
-    h2_size = s.get("h2_font_size", "18px")
-    rule = s.get("rule", "#ddd")
-    bold_color = s.get("bold", "#333")
-    badge_bg = s.get("h2_badge_bg", "#f7b731")
-    badge_text = s.get("h2_badge_text", "#ffffff")
-    index_bg = s.get("h2_index_bg", accent)
-    index_text = s.get("h2_index_text", "#ffffff")
-    label = format_text(escape_html(text), s)
 
     if style == "quote_line":
         return (
@@ -897,8 +863,10 @@ def generate_html(data, s):
             )
         elif btype == "para":
             formatted = format_text(escape_html(text), s)
+            p_indent = s.get("p_indent", "0")
+            indent_css = f';text-indent:{p_indent}' if p_indent and p_indent != "0" else ''
             content_parts.append(
-                f'<p style="margin:0 0 14px 0">{formatted}</p>'
+                f'<p style="margin:0 0 14px 0{indent_css}">{formatted}</p>'
             )
         elif btype in ("ol", "ul", "task"):
             content_parts.append(_render_list_block(block, s))
@@ -935,6 +903,12 @@ ARTICLE_DEFAULTS = {
     "h2_index_text": "#ffffff",
     "h3_color": "#333",
     "h4_color": "#555",
+    "h2_frame_bg": "#f8f0fb",
+    "h2_frame_border": "rgb(198,110,73)",
+    "h2_frame_border_width": "5px",
+    "h2_frame_radius": "4px",
+    "p_indent": "0",
+    "hero_style": "default",
     "cover_label": "AI 实践观察",
     "footer": "",
     "ending_lines": [
@@ -1041,6 +1015,31 @@ ARTICLE_THEMES = {
         "h2_index_bg": "#1857b8",
         "h2_index_text": "#ffffff",
         "cover_label": "PRODUCT BRIEF",
+        "footer": "",
+        "ending_lines": [],
+    },
+    "scholar": {
+        "bg": "#ffffff",
+        "content_bg": "transparent",
+        "text": "#333333",
+        "accent": "#9b59b6",
+        "hero_bg": "#ffffff",
+        "hero_title_color": "#1a1a1a",
+        "bold": "#333333",
+        "rule": "#eeeeee",
+        "caption": "#888888",
+        "title_font_size": "22px",
+        "text_font_size": "15px",
+        "h2_font_size": "17px",
+        "h2_style": "framed_pill",
+        "h2_frame_bg": "#f8f0fb",
+        "h2_frame_border": "#9b59b6",
+        "h2_frame_border_width": "5px",
+        "h2_frame_radius": "4px",
+        "h3_color": "#2e7d32",
+        "p_indent": "2em",
+        "hero_style": "minimal",
+        "cover_label": "",
         "footer": "",
         "ending_lines": [],
     },
