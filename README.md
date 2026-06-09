@@ -205,7 +205,13 @@ rm -rf /tmp/mukun_md_push
   <img src="assets/article_blueprint.JPG" alt="文章模式-中轴蓝卡" width="480" />
 </p>
 
-> 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，6 种预设配色配置文件参见 [references/](references/) 目录。
+### 文章模式（紫绿清韵）
+
+> "用紫绿清韵风格把这篇文章转成微信公众号 HTML"
+
+白底 + 紫色胶囊框 H2（紫底紫字紫左边）+ 翠绿 H3 + 正文 2em 首行缩进，紫绿双色清雅韵味，适合深度技术随笔、研究笔记、思辨长文。预览效果见 [examples/scholar/article_scholar_example.html](examples/scholar/article_scholar_example.html)。
+
+> 完整示例 Markdown 源文件及生成的 HTML 参见 [examples/](examples/) 目录，7 种预设配色配置文件参见 [references/](references/) 目录。
 
 ### 📝 支持的 Markdown 格式
 
@@ -383,14 +389,22 @@ SqlNode node = parser.parseQuery();
 | `title_font_size` | `22px` | 文章主标题 |
 | `text_font_size` | `16px` | 正文文字 |
 | `h2_font_size` | `18px` | H2 标题 |
-| `h2_style` | `pill` | H2 样式：`pill` / `quote_line` / `badge_block` / `center_card` |
+| `h2_style` | `pill` | H2 样式：`pill` / `quote_line` / `badge_block` / `center_card` / `framed_pill` |
 | `h2_badge_bg` | `#f7b731` | `badge_block` 编号徽章背景色 |
 | `h2_badge_text` | `#ffffff` | `badge_block` 编号徽章文字色 |
 | `h2_index_bg` | `accent` | `center_card` 编号卡背景色 |
 | `h2_index_text` | `#ffffff` | `center_card` 编号卡文字色 |
+| `h2_frame_bg` | `#f8f0fb` | `framed_pill` 胶囊背景色 |
+| `h2_frame_border` | `accent` | `framed_pill` 左边框颜色 |
+| `h2_frame_border_width` | `5px` | `framed_pill` 左边框宽度 |
+| `h2_frame_radius` | `4px` | `framed_pill` 圆角半径 |
+| `h3_color` | `#333` | H3 子标题文字颜色 |
+| `h4_color` | `#555` | H4 小标题文字颜色 |
+| `p_indent` | `0` | 正文段落首行缩进（如 `2em` 启用学术体缩进） |
+| `hero_style` | `default` | 封面样式：`default`（色块卡片）/ `minimal`（极简左对齐大标题） |
 | `font_family` | 系统中文字体栈 | 页面字体栈 |
 | `content_bg` | `transparent` | 正文区背景色 |
-| `cover_label` | `AI 实践观察` | 封面副标题 |
+| `cover_label` | `AI 实践观察` | 封面副标题（`minimal` 模式下若为空则不显示） |
 | `footer` | `""` | 底部署名（空字符串不显示） |
 | `ending_lines` | 5 行默认尾栏 | 文末尾栏，`[]` 关闭，支持 HTML 标签 |
 
@@ -398,7 +412,7 @@ SqlNode node = parser.parseQuery();
 
 #### 🎨 预设样式速查（自然语言 → 配置文件）
 
-文章模式内置 6 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
+文章模式内置 7 种预设样式，通过 AI 智能体（WorkBuddy/Claude Code 等）用自然语言描述即可自动匹配。也可直接通过 `--config` 传入 `references/` 下的配置文件。
 
 | 预设 | 配置文件 | 视觉特征 | 自然语言触发词 |
 |------|---------|---------|--------------|
@@ -408,6 +422,7 @@ SqlNode node = parser.parseQuery();
 | 青绿引号 | `references/article_journal.yaml` | 米白底 + 青绿引号线 H2（大 Q + 引号包裹标题） | "青绿"、"青绿引号"、"引号标题"、"文艺"、"杂志"、"专栏"、"清爽" |
 | 角标绿条 | `references/article_growth.yaml` | 白底 + 黄色编号角标 + 绿色标签块 H2 | "角标"、"角标绿条"、"编号角标"、"badge"、"清单"、"步骤"、"运营" |
 | 中轴蓝卡 | `references/article_blueprint.yaml` | 冷灰底 + 中轴蓝色编号卡 H2（居中编号 + 两侧横线） | "中轴"、"中轴蓝卡"、"编号卡"、"center"、"灰底"、"冷灰"、"产品文档" |
+| 紫绿清韵 | `references/article_scholar.yaml` | 白底 + 紫色胶囊框 H2（紫底紫字紫左边） + 翠绿 H3 + 首行缩进 | "清韵"、"紫绿"、"紫绿清韵"、"紫胶囊"、"紫框"、"双色对比"、"技术博客"、"深度技术"、"研究笔记"、"思辨"、"学术"、"码上菩提" |
 
 ```bash
 # 直接用 --config 引用预设
@@ -418,7 +433,7 @@ python3 scripts/md2wechat_html.py --config references/article_journal.yaml story
 
 #### 🔧 如何新增自定义配置
 
-内置的 6 种预设样式不能满足需求时，有两种方式新增自定义配置：
+内置的 7 种预设样式不能满足需求时，有两种方式新增自定义配置：
 
 **方式一：修改全局配置文件**（影响所有未指定 `--config` 的文章模式推送）
 
@@ -600,13 +615,14 @@ mukun_md_push/
 │   ├── md2news_html.py          # 新闻模式转换器
 │   ├── md2article_html.py       # 文章模式转换器
 │   └── push_daily.py            # 转换 + 推送草稿箱脚本
-├── references/                  # 文章模式 6 种预设样式（自然语言 → 配置文件）
+├── references/                  # 文章模式 7 种预设样式（自然语言 → 配置文件）
 │   ├── article_default.yaml     # 默认（白底灰字 + 棕橘胶囊标题）
 │   ├── article_nostalgic.yaml   # 泛黄怀旧（古卷泛黄 + 深棕胶囊标题）
 │   ├── article_modern.yaml      # 科技蓝紫（白底 + 蓝紫胶囊标题）
 │   ├── article_journal.yaml     # 青绿引号（米白底 + 大 Q 引号线标题）
 │   ├── article_growth.yaml      # 角标绿条（白底 + 黄角标 + 绿标签块）
-│   └── article_blueprint.yaml   # 中轴蓝卡（冷灰底 + 中轴蓝色编号卡）
+│   ├── article_blueprint.yaml   # 中轴蓝卡（冷灰底 + 中轴蓝色编号卡）
+│   └── article_scholar.yaml     # 紫绿清韵（白底 + 紫色胶囊框 H2 + 翠绿 H3 + 首行缩进）
 ├── examples/
 │   ├── config_example.yaml              # 完整配置示例（news + article 所有可配置项）
 │   ├── default/                         # 默认配色示例（源文件 + 生成 HTML）
@@ -625,8 +641,10 @@ mukun_md_push/
 │   │   └── article_journal_example.html      # 文章模式 HTML（生成，青绿配色）
 │   ├── growth/                        # 角标绿条配色方案
 │   │   └── article_growth_example.html       # 文章模式 HTML（生成，角标配色）
-│   └── blueprint/                     # 中轴蓝卡配色方案
-│       └── article_blueprint_example.html    # 文章模式 HTML（生成，蓝卡配色）
+│   ├── blueprint/                     # 中轴蓝卡配色方案
+│   │   └── article_blueprint_example.html    # 文章模式 HTML（生成，蓝卡配色）
+│   └── scholar/                       # 紫绿学术配色方案
+│       └── article_scholar_example.html      # 文章模式 HTML（生成，学术配色）
 ├── LICENSE
 └── README.md
 ```
@@ -640,6 +658,17 @@ mukun_md_push/
 
 
 ## 📋 修改说明
+
+### 2026-06-09
+
+- **新增「紫绿清韵」预设样式**：第 7 种文章模式预设，致敬「码上菩提」公众号的双色技术博客风格。H2 用浅紫底 + 紫文字 + 紫色 5px 左粗边 + 4px 圆角胶囊框；H3 用翠绿加粗（`#2e7d32`）；正文 15px + 首行缩进 2em；封面采用极简模式（白底黑色大标题，左对齐，无装饰）。配置文件 `references/article_scholar.yaml`，触发词：清韵 / 紫绿 / 紫绿清韵 / 紫胶囊 / 紫色胶囊 / 紫框 / 双色 / 双色对比 / 技术博客 / 深度技术 / 研究笔记 / 思辨 / 学术 / 学者 / 码上菩提
+- **文章模式脚本能力扩展**（新增 4 项可配置维度，老 6 个预设默认行为不变）：
+  - `h2_style: framed_pill` — 第 5 种 H2 样式：背景色 + 主色文字 + 主色左粗边 + 圆角胶囊。配套 `h2_frame_bg` / `h2_frame_border` / `h2_frame_border_width` / `h2_frame_radius` 四项细节配置
+  - `p_indent` — 正文段落首行缩进（默认 `0`；填 `2em` 启用学术体首行缩进）
+  - `hero_style` — 封面布局：`default`（色块卡片，原行为）/ `minimal`（极简左对齐大标题，无顶条无 label）
+- **清理脚本中重复定义的 `render_h2` 函数**：原文件中存在两个相同函数定义（同名后定义覆盖前定义），现合并为单一函数并新增 `framed_pill` 分支
+- **SKILL.md 注册触发词**：在预设表格、匹配规则中加入「紫绿清韵」对应分支
+- **README 同步更新**：示例卡片、预设速查表（6 种 → 7 种）、配置项表格、目录结构
 
 ### 2026-06-06
 
