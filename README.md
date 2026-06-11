@@ -133,6 +133,18 @@ rm -rf /tmp/mukun_md_push
 
 > Codex 的 Skills 是独立 `.md` 文件格式（Description / Input / Steps），而本 Skill 使用 `SKILL.md` + `scripts/` 结构。上述安装方式让 Codex 读取到 SKILL.md 中的指令内容，同时脚本可用于手动调用。
 
+## ⚙️ 配置文件
+
+安装 Skill 后，需要在`~/.md_push_wechat/config.yaml`配置微信公众号appid和secret：
+
+```yaml
+wechat:
+  appid: 微信公众号的 AppID
+  secret: 对应的 AppSecret
+```
+
+具体获取方式参考说明：[how_to_config_wechat](./how_to_config_wechat.md)
+
 ## 💡 使用示例
 
 安装 Skill 后，直接用自然语言告诉 AI 智能体即可：
