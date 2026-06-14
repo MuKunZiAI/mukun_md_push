@@ -14,6 +14,7 @@ style:
         title_font_size: "26px"
         text_font_size: "17px"
         h2_font_size: "19px"
+        padding: "20px 16px"
         cover_label: "中华典故 · 历史长卷"
         footer: "泛黄旧卷 · 品读千古"
         ending_lines: []

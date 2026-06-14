@@ -49,7 +49,7 @@ pre.code-snippet__js code{display:block;font-family:inherit}
 </style>
 </head>
 <body style="margin:0;padding:0;font-family:__FONT_FAMILY__;text-indent:0">
-<section style="background:__BG__;padding:20px 16px">
+<section style="background:__BG__;padding:__PADDING__">
 
 <!-- 封面 -->
 <section style="background:__HERO_BG__;padding:28px 20px 22px;margin:0 0 24px 0;border-top:4px solid __RULE__">
@@ -112,6 +112,7 @@ def _build_article_html(s, title, content, footer_section="", ending_section="")
         ("TEXT_FONT_SIZE", s["text_font_size"]),
         ("TEXT_COLOR", text_color),
         ("CONTENT_BG", s.get("content_bg", "transparent")),
+        ("PADDING", s.get("padding", "0 0")),
         ("TITLE", title),
         ("CONTENT", content),
         ("FOOTER_SECTION", footer_section),
@@ -908,6 +909,7 @@ ARTICLE_DEFAULTS = {
     "h2_frame_border_width": "5px",
     "h2_frame_radius": "4px",
     "p_indent": "0",
+    "padding": "0 0",
     "hero_style": "default",
     "cover_label": "AI 实践观察",
     "footer": "",
@@ -937,6 +939,7 @@ ARTICLE_THEMES = {
         "h2_font_size": "18px",
         "cover_label": "成语典故 · 历史人物",
         "footer": "成语典故 · 历史人物",
+        "padding": "20px 16px",
         "ending_lines": [],
     },
     "modern": {
