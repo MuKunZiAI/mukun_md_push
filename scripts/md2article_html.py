@@ -48,7 +48,7 @@ pre.code-snippet__js code{display:block;font-family:inherit}
 .code-snippet__subst{color:#56b6c2}
 </style>
 </head>
-<body style="margin:0;padding:0;font-family:__FONT_FAMILY__;text-indent:0">
+<body style="margin:0;padding:0;font-family:__FONT_FAMILY__;word-break:keep-all">
 <section style="background:__BG__;padding:__PADDING__">
 
 <!-- 封面 -->
@@ -58,7 +58,7 @@ pre.code-snippet__js code{display:block;font-family:inherit}
 </section>
 
 <!-- 正文区域 -->
-<section style="font-size:__TEXT_FONT_SIZE__;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px;color:__TEXT_COLOR__;background:__CONTENT_BG__">
+<section style="font-size:__TEXT_FONT_SIZE__;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px;color:__TEXT_COLOR__;background:__CONTENT_BG__;word-break:keep-all">
 __CONTENT__
 </section>
 
@@ -412,14 +412,23 @@ def escape_html(text):
     return text
 
 
-def format_text(text, s):
-    """文章文本格式化：粗体、链接、行内代码、图片"""
+def format_text(text, s, line_height=None):
+    """文章文本格式化：粗体、链接、行内代码、图片
+    line_height: 为普通文本 <span leaf=""> 显式设置 line-height，
+                 解决微信编辑器中 <span> 不继承父级 line-height 的问题"""
     text = escape_html(text)
 
     # 行内代码
+    # 微信编辑器可能对 <code> 标签有特殊处理（如当作块级元素），
+    # 改用 <b> 标签（font-weight:normal）以避免被包裹在 <section> 中。
     accent = s["accent"]
     def replace_code(m):
-        return f'<code style="font-size:13px;background:#f5f5f5;color:{accent};padding:2px 6px">{m.group(1)}</code>'
+        if line_height is None:
+            # 列表项：外层 <b> 和内层 <span> 都不加 line-height/letter-spacing，
+            # 避免微信编辑器因 <span> 有 style 而插入 <section>
+            return f'<b style="font-weight:normal;font-size:13px;background:#f5f5f5;color:{accent};padding:0 6px;font-family:monospace"><span leaf="">{m.group(1)}</span></b>'
+        lh = line_height or 1.75
+        return f'<b style="font-weight:normal;font-size:13px;line-height:{lh};background:#f5f5f5;color:{accent};padding:0 6px;font-family:monospace"><span leaf="" style="line-height:{lh};letter-spacing:2px">{m.group(1)}</span></b>'
     text = re.sub(r'`([^`]+)`', replace_code, text)
 
     # 内联图片（必须在链接之前处理，避免 ![...](url) 被链接正则误匹配）
@@ -442,12 +451,168 @@ def format_text(text, s):
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_link, text)
 
     # 粗体
+    # 微信不允许 </b> 后紧跟全角标点（会强制换行），
+    # 因此把紧跟在加粗文本后的全角标点及后续纯文本也纳入 <b> 内，
+    # 用 <span textstyle="" style="font-weight: normal"> 包裹非加粗部分。
     bold_color = s.get("bold", "#333")
-    def replace_bold(m):
-        return f'<b style="font-weight:bold;color:{bold_color}">{m.group(1)}</b>'
-    text = re.sub(r'\*\*([^*]+)\*\*', replace_bold, text)
 
-    return text
+    def _split_to_leaf_spans(text, normal_weight=False):
+        """将文本拆分为普通文本段和 HTML 标签。
+        普通文本段包 <span leaf=""/>；已有的 <span leaf="" style="..."> 结构
+        （含行内代码）保持原样。返回扁平化的 HTML 字符串。"""
+        if not text:
+            return ''
+        if line_height is None:
+            # 列表项：普通文本片段用 <b style="font-weight:normal"><span leaf=""> 包裹，
+            # 避免作为 <li> 的纯文本子节点被微信编辑器自动组织到 <section> 中。
+            # 已有的 HTML 标签（如行内代码 <b>）保持原样。
+            if '<' not in text:
+                return f'<b style="font-weight:normal"><span leaf="">{text}</span></b>'
+            parts = []
+            i = 0
+            while i < len(text):
+                if text[i] == '<':
+                    # 跳过完整的 <b>...</b> 结构（行内代码）
+                    if text[i:i+2] == '<b' and (i+2 >= len(text) or text[i+2] in ' >'):
+                        close_tag = text.find('</b>', i)
+                        if close_tag != -1:
+                            parts.append(text[i:close_tag+4])
+                            i = close_tag + 4
+                            continue
+                    # 跳过完整的 <strong>...</strong> 结构
+                    if text[i:i+8] == '<strong' and (i+8 >= len(text) or text[i+8] in ' >'):
+                        close_tag = text.find('</strong>', i)
+                        if close_tag != -1:
+                            parts.append(text[i:close_tag+9])
+                            i = close_tag + 9
+                            continue
+                    # 其他标签（开标签或闭标签）保持原样
+                    tag_close = text.find('>', i)
+                    if tag_close != -1:
+                        parts.append(text[i:tag_close+1])
+                        i = tag_close + 1
+                    else:
+                        parts.append(f'<b style="font-weight:normal"><span leaf="">{text[i]}</span></b>')
+                        i += 1
+                else:
+                    j = i
+                    while j < len(text) and text[j] != '<':
+                        j += 1
+                    parts.append(f'<b style="font-weight:normal"><span leaf="">{text[i:j]}</span></b>')
+                    i = j
+            return ''.join(parts)
+        base = f'line-height:{line_height};letter-spacing:2px'
+        if '<' not in text:
+            if normal_weight:
+                return f'<span leaf="" style="font-weight: normal;{base}">{text}</span>'
+            return f'<span leaf="" style="{base}">{text}</span>'
+        parts = []
+        i = 0
+        while i < len(text):
+            if text[i] == '<':
+                # 跳过已有的 <span leaf=""...> ... </span> 结构（含行内代码）
+                if text[i:i+12] == '<span leaf="':
+                    close_tag = text.find('</span>', i)
+                    if close_tag != -1:
+                        parts.append(text[i:close_tag+7])
+                        i = close_tag + 7
+                        continue
+                # 其他标签（如 <b>、<a>、<img> 等）保持原样
+                tag_close = text.find('>', i)
+                if tag_close != -1:
+                    parts.append(text[i:tag_close+1])
+                    i = tag_close + 1
+                else:
+                    if normal_weight:
+                        parts.append(f'<span leaf="" style="font-weight: normal;{base}">{text[i]}</span>')
+                    else:
+                        parts.append(f'<span leaf="" style="{base}">{text[i]}</span>')
+                    i += 1
+            else:
+                j = i
+                while j < len(text) and text[j] != '<':
+                    j += 1
+                if normal_weight:
+                    parts.append(f'<span leaf="" style="font-weight: normal;{base}">{text[i:j]}</span>')
+                else:
+                    parts.append(f'<span leaf="" style="{base}">{text[i:j]}</span>')
+                i = j
+        return ''.join(parts)
+
+    def _replace_bold(text):
+        import re as _re
+        _CJK_PUNCT = set('。，、；：！？"」』")])』》】–—…')
+        matches = list(_re.finditer(r'\*\*([^\*]+)\*\*', text))
+        if not matches:
+            return _split_to_leaf_spans(text)
+        # 从后往前替换，避免位置偏移
+        parts = []
+        prev_end = len(text)
+        for m in reversed(matches):
+            start, raw_end = m.start(), m.end()
+            bold_text = m.group(1)
+            end = raw_end
+            # 检查 end 后是否紧跟全角标点
+            if end < len(text) and text[end] in _CJK_PUNCT:
+                punct = text[end]
+                end += 1
+                # 继续匹配后续文本，遇到 '<' 时跳过整个标签（保留标签内容）
+                rest_parts = []
+                while end < len(text) and text[end] != '\n':
+                    if text[end:end+2] == '**':
+                        # 遇到下一个 ** 加粗标记，停止吞入，
+                        # 清空已吞入的文本，只保留全角标点本身。
+                        # 回退 end 到 raw_end，确保中间文本不被吞掉。
+                        rest_parts = []
+                        end = raw_end
+                        break
+                    if text[end] == '<':
+                        # 跳过整个 HTML 标签
+                        tag_close = text.find('>', end)
+                        if tag_close != -1:
+                            rest_parts.append(text[end:tag_close+1])
+                            end = tag_close + 1
+                        else:
+                            break
+                    else:
+                        rest_parts.append(text[end])
+                        end += 1
+                rest = ''.join(rest_parts)
+                extra_content = punct + rest
+                # 如果 end 被回退到 raw_end（遇到 **），标点留在中间文本中，
+                # 不放入 <b> 内，避免重复。
+                if extra_content and end != raw_end:
+                    extra_html = _split_to_leaf_spans(extra_content, normal_weight=True)
+                else:
+                    extra_html = ''
+            else:
+                extra_html = ''
+            # <b> 后的文本，扁平化拆分，避免 <span leaf=""> 嵌套 <span style="">
+            after = text[end:prev_end]
+            if after:
+                parts.append(_split_to_leaf_spans(after))
+            # 构建 <strong> 内部的 inner
+            # 列表项中 bold_text 直接放入 <strong>，不额外包裹，
+            # 避免 <b style="font-weight:normal"> 覆盖 <strong> 的加粗效果
+            if line_height is None:
+                inner = bold_text
+            else:
+                inner = _split_to_leaf_spans(bold_text)
+            if extra_html:
+                inner += extra_html
+            parts.append(
+                f'<strong style="color:{bold_color}">'
+                f'{inner}</strong>'
+            )
+            prev_end = start
+        # 最前面的文本，扁平化拆分
+        before = text[:prev_end]
+        if before:
+            parts.append(_split_to_leaf_spans(before))
+        parts.reverse()
+        return ''.join(parts)
+
+    return _replace_bold(text)
 
 
 def _split_table_row(row):
@@ -497,12 +662,13 @@ def render_table(rows, s):
 
     bold_color = s.get("bold", "#333")
     base = 'padding:10px 12px;border:1px solid #ddd'
-    html = '<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">\n'
+    text_size = s.get("text_font_size", "15px")
+    html = f'<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:{text_size}">\n'
 
     html += '  <thead>\n'
     html += '    <tr>\n'
     for h in headers:
-        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{bold_color};font-size:13px">{format_text(h, s)}</th>\n'
+        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{bold_color};font-size:{text_size}">{format_text(h, s, line_height="1.75")}</th>\n'
     html += '    </tr>\n'
     html += '  </thead>\n'
 
@@ -511,7 +677,7 @@ def render_table(rows, s):
         bg = '#fff' if i % 2 == 0 else '#fafafa'
         html += '    <tr>\n'
         for cell in row:
-            html += f'      <td style="{base};background:{bg}">{format_text(cell, s)}</td>\n'
+            html += f'      <td style="{base};background:{bg}">{format_text(cell, s, line_height="1.75")}</td>\n'
         html += '    </tr>\n'
     html += '  </tbody>\n'
     html += '</table>\n'
@@ -521,13 +687,14 @@ def render_table(rows, s):
 
 def render_blockquote(text, s):
     """渲染引用块 —— 每行用独立 <p> 分段，避免 <br> 被转义"""
+    text_size = s.get("text_font_size", "15px")
     lines = text.split('\n')
     parts = []
     for line in lines:
         escaped = escape_html(line)
-        formatted = format_text(escaped, s)
+        formatted = format_text(escaped, s, line_height="1.9")
         parts.append(
-            f'<p style="margin:0 0 8px 0;font-size:14px;font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
+            f'<p style="margin:0 0 8px 0;font-size:{text_size};font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
         )
     # 去掉最后一行多余的底部 margin
     parts[-1] = parts[-1].replace('margin:0 0 8px 0', 'margin:0')
@@ -535,13 +702,6 @@ def render_blockquote(text, s):
         f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8;'
         f'border-left:4px solid {s["accent"]}">'
         f'{"".join(parts)}'
-        f'</section>'
-    )
-    return html
-    html = (
-        f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8'
-        f';border-left:4px solid {s["accent"]}">'
-        f'<p style="margin:0;font-size:14px;font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
         f'</section>'
     )
     return html
@@ -691,31 +851,32 @@ def _render_list_block(block, s):
     """递归渲染列表块（ol/ul/task），支持任意层级嵌套"""
     list_type = block["type"]
     list_attrs = ""
+    text_size = s.get("text_font_size", "15px")
 
     if list_type == "ol":
         tag = "ol"
-        list_style = 'margin:0 0 14px 0;padding-left:24px'
+        list_style = f'margin:0 0 14px 0;padding-left:24px;font-size:{text_size}'
         first_value = block["items"][0].get("value") if block.get("items") else None
         if isinstance(first_value, int) and first_value > 0:
             list_attrs = f' start="{first_value}"'
     elif list_type == "task":
         tag = "ul"
-        list_style = 'margin:0 0 14px 0;padding-left:24px;list-style:none'
+        list_style = f'margin:0 0 14px 0;padding-left:24px;list-style:none;font-size:{text_size}'
     else:
         tag = "ul"
-        list_style = 'margin:0 0 14px 0;padding-left:24px'
+        list_style = f'margin:0 0 14px 0;padding-left:24px;font-size:{text_size}'
 
     items_html = []
     for item in block["items"]:
         item_text = item["text"]
-        formatted = format_text(escape_html(item_text), s)
+        formatted = format_text(item_text, s)
 
         # 任务列表渲染
         if list_type == "task":
             checked = item.get("checked", False)
             checkbox = "☑" if checked else "☐"
             color = "#999" if checked else "#333"
-            li_content = f'<span style="color:{color};margin-right:6px;font-size:14px">{checkbox}</span>{formatted}'
+            li_content = f'<span style="color:{color};margin-right:6px;font-size:{text_size}">{checkbox}</span>{formatted}'
         else:
             li_content = formatted
 
@@ -737,11 +898,11 @@ def _render_list_block(block, s):
 
         if children_html:
             items_html.append(
-                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9">{li_content}{children_html}</li>'
+                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9;font-size:{text_size};letter-spacing:2px">{li_content}{children_html}</li>'
             )
         else:
             items_html.append(
-                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9">{li_content}</li>'
+                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9;font-size:{text_size};letter-spacing:2px">{li_content}</li>'
             )
 
     # 去除 \\n：微信编辑器会把 HTML 元素间的换行解释为新列表项，产生多余带点空行
@@ -763,7 +924,7 @@ def render_h2(text, s, index):
     badge_text = s.get("h2_badge_text", "#ffffff")
     index_bg = s.get("h2_index_bg", accent)
     index_text = s.get("h2_index_text", "#ffffff")
-    label = format_text(escape_html(text), s)
+    label = format_text(escape_html(text), s, line_height="1.6")
 
     if style == "framed_pill":
         # 紫绿学术风 H2：浅色底 + 主色文字 + 主色左粗边 + 圆角胶囊框
@@ -838,15 +999,17 @@ def generate_html(data, s):
             content_parts.append(render_h2(text, s, h2_index))
         elif btype == "heading" and block["level"] == 3:
             h3_color = s.get("h3_color", "#333")
+            h3_size = s.get("h3_font_size", "17px")
             content_parts.append(
-                f'<p style="margin:22px 0 12px 0;font-size:16px;font-weight:bold;color:{h3_color};line-height:1.5">'
-                f'{format_text(escape_html(text), s)}</p>'
+                f'<p style="margin:22px 0 12px 0;font-size:{h3_size};font-weight:bold;color:{h3_color};line-height:1.5">'
+                f'{format_text(text, s, line_height="1.5")}</p>'
             )
         elif btype == "heading" and block["level"] == 4:
             h4_color = s.get("h4_color", "#555")
+            h4_size = s.get("h4_font_size", "16px")
             content_parts.append(
-                f'<p style="margin:18px 0 10px 0;font-size:15px;font-weight:bold;color:{h4_color};line-height:1.5">'
-                f'{format_text(escape_html(text), s)}</p>'
+                f'<p style="margin:18px 0 10px 0;font-size:{h4_size};font-weight:bold;color:{h4_color};line-height:1.5">'
+                f'{format_text(text, s, line_height="1.5")}</p>'
             )
         elif btype == "blockquote":
             content_parts.append(render_blockquote(text, s))
@@ -863,11 +1026,12 @@ def generate_html(data, s):
                 f'</p>'
             )
         elif btype == "para":
-            formatted = format_text(escape_html(text), s)
+            formatted = format_text(text, s, line_height="1.75")
             p_indent = s.get("p_indent", "0")
             indent_css = f';text-indent:{p_indent}' if p_indent and p_indent != "0" else ''
+            text_size = s.get("text_font_size", "15px")
             content_parts.append(
-                f'<p style="margin:0 0 14px 0{indent_css}">{formatted}</p>'
+                f'<p style="margin:0 0 14px 0;font-size:{text_size};line-height:1.75{indent_css}">{formatted}</p>'
             )
         elif btype in ("ol", "ul", "task"):
             content_parts.append(_render_list_block(block, s))
@@ -895,8 +1059,10 @@ ARTICLE_DEFAULTS = {
     "rule": "#ddd",
     "caption": "#888",
     "title_font_size": "22px",
-    "text_font_size": "16px",
+    "text_font_size": "15px",
     "h2_font_size": "18px",
+    "h3_font_size": "17px",
+    "h4_font_size": "16px",
     "h2_style": "pill",
     "h2_badge_bg": "#f7b731",
     "h2_badge_text": "#ffffff",

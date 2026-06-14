@@ -14,6 +14,8 @@ style:
         title_font_size: "24px"
         text_font_size: "17px"
         h2_font_size: "42px"
+        h3_font_size: "18px"
+        h4_font_size: "17px"
         cover_label: "PRODUCT BRIEF"
         footer: ""
         h2_style: "center_card"
