@@ -14,6 +14,8 @@ style:
         title_font_size: "22px"
         text_font_size: "15px"
         h2_font_size: "17px"
+        h3_font_size: "16px"
+        h4_font_size: "15px"
         h3_color: "#2e7d32"          # H3 翠绿色（双色对比关键）
         p_indent: "2em"              # 正文首行缩进 2em（学术体特征）
         hero_style: "minimal"        # 封面极简模式：去顶条 / 去 SCHOLAR NOTE 标签

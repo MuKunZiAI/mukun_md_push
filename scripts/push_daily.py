@@ -706,6 +706,23 @@ def update_draft(access_token, media_id, title, html_content, thumb_media_id, co
     return media_id
 
 
+def unescape_code_blocks(html):
+    """对 <pre class="code-snippet__js"> 内的 HTML 实体做反向解码。
+
+    微信 code-snippet 组件直接读取 HTML 源码文本，
+    不会解码 &lt; / &gt; 等实体，因此上传前需要把代码文本中的
+    实体还原为字面字符 < 和 >。
+    """
+    import html as _html
+    import re
+
+    def _unescape_pre(match):
+        return _html.unescape(match.group(0))
+
+    pattern = r'<pre class="code-snippet__js"[^>]*>[\s\S]*?</pre>'
+    return re.sub(pattern, _unescape_pre, html)
+
+
 def extract_frontmatter(md_file):
     """从 Markdown 文件提取 frontmatter 元数据（标题、摘要等）
 
@@ -856,11 +873,12 @@ def main():
         cmd.extend(["--news", md_file, html_file])
 
     print(f"步骤 1: Markdown → 微信兼容 HTML（{mode_label}）")
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
         print(f"ERROR: HTML 生成失败:\n{result.stderr}")
         sys.exit(1)
-    print(result.stdout.strip())
+    if result.stdout:
+        print(result.stdout.strip())
 
     # 读取 HTML 内容
     with open(html_file, "r", encoding="utf-8") as f:
@@ -884,6 +902,11 @@ def main():
     # 4. 正文图片上传与替换（支持缓存复用）
     print(f"\n步骤 3: 上传正文图片素材并替换引用")
     html_content = replace_local_images_with_wechat_assets(md_file, html_content, token)
+
+    # 上传前对代码块内的 HTML 实体做反向解码
+    # 微信 code-snippet 组件直接读取 HTML 源码，不解码 &lt; &gt; 等实体，
+    # 因此上传前需要将代码文本中的实体还原为字面字符 < 和 >
+    html_content = unescape_code_blocks(html_content)
 
     # 5. 推送 / 更新草稿箱
     if update_mode:
