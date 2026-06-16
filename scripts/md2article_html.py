@@ -48,7 +48,7 @@ pre.code-snippet__js code{display:block;font-family:inherit}
 .code-snippet__subst{color:#56b6c2}
 </style>
 </head>
-<body style="margin:0;padding:0;font-family:__FONT_FAMILY__;word-break:keep-all">
+<body style="margin:0;padding:0;font-family:__FONT_FAMILY__">
 <section style="background:__BG__;padding:__PADDING__">
 
 <!-- 封面 -->
@@ -58,7 +58,7 @@ pre.code-snippet__js code{display:block;font-family:inherit}
 </section>
 
 <!-- 正文区域 -->
-<section style="font-size:__TEXT_FONT_SIZE__;line-height:2em;letter-spacing:1px;padding:0 4px 20px 4px;color:__TEXT_COLOR__;background:__CONTENT_BG__;word-break:keep-all">
+<section style="font-size:__TEXT_FONT_SIZE__;line-height:1.75;padding:0 4px 20px;color:__TEXT_COLOR__;background:__CONTENT_BG__;letter-spacing:0.034em">
 __CONTENT__
 </section>
 
@@ -413,23 +413,18 @@ def escape_html(text):
 
 
 def format_text(text, s, line_height=None):
-    """文章文本格式化：粗体、链接、行内代码、图片
-    line_height: 为普通文本 <span leaf=""> 显式设置 line-height，
-                 解决微信编辑器中 <span> 不继承父级 line-height 的问题"""
+    """文章文本格式化：粗体、链接、行内代码、图片。
+    扁平化设计：避免不必要的嵌套，只在需要语义化或样式差异时使用标签包裹。
+    line_height 参数保留用于兼容旧接口，但不再产生额外嵌套。"""
     text = escape_html(text)
 
-    # 行内代码
-    # 微信编辑器可能对 <code> 标签有特殊处理（如当作块级元素），
-    # 改用 <b> 标签（font-weight:normal）以避免被包裹在 <section> 中。
+    # 行内代码 — 扁平化：使用 <code> 标签，单一内联样式
     accent = s["accent"]
-    def replace_code(m):
-        if line_height is None:
-            # 列表项：外层 <b> 和内层 <span> 都不加 line-height/letter-spacing，
-            # 避免微信编辑器因 <span> 有 style 而插入 <section>
-            return f'<b style="font-weight:normal;font-size:13px;background:#f5f5f5;color:{accent};padding:0 6px;font-family:monospace"><span leaf="">{m.group(1)}</span></b>'
-        lh = line_height or 1.75
-        return f'<b style="font-weight:normal;font-size:13px;line-height:{lh};background:#f5f5f5;color:{accent};padding:0 6px;font-family:monospace"><span leaf="" style="line-height:{lh};letter-spacing:2px">{m.group(1)}</span></b>'
-    text = re.sub(r'`([^`]+)`', replace_code, text)
+    text = re.sub(
+        r'`([^`]+)`',
+        lambda m: f'<code style="font-family:monospace;font-size:13px;background:#f5f5f5;color:{accent};padding:2px 6px;border-radius:3px">{m.group(1)}</code>',
+        text
+    )
 
     # 内联图片（必须在链接之前处理，避免 ![...](url) 被链接正则误匹配）
     # 同时在回调中检查匹配位置是否在 <code> 标签内，避免误转换行内代码中的 ![]()
@@ -450,170 +445,14 @@ def format_text(text, s, line_height=None):
         return f'<a href="{m.group(2)}" style="color:{accent};text-decoration:none">{m.group(1)}</a>'
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_link, text)
 
-    # 粗体
-    # 微信不允许 </b> 后紧跟全角标点（会强制换行），
-    # 因此把紧跟在加粗文本后的全角标点及后续纯文本也纳入 <b> 内，
-    # 用 <span textstyle="" style="font-weight: normal"> 包裹非加粗部分。
-    bold_color = s.get("bold", "#333")
+    # 粗体 - 扁平化：直接用 <strong> 包裹，不嵌套 span
+    # 注意：不使用 overflow-wrap / max-width，避免微信编辑器将其视为块级元素导致断行
+    bold_color = s.get("bold", "#555555")
+    text = re.sub(r'\*\*([^\*]+)\*\*', lambda m: f'<strong style="color:{bold_color}">{m.group(1)}</strong>', text)
+    # 第二步：后处理——将 <strong>text</strong>： 合并为 <strong>text：</strong>，避免标签边界处微信浏览器断行
+    text = re.sub(r'(<strong style="[^"]*">)([^<]+)</strong>：', lambda m: f'{m.group(1)}{m.group(2)}：</strong>', text)
 
-    def _split_to_leaf_spans(text, normal_weight=False):
-        """将文本拆分为普通文本段和 HTML 标签。
-        普通文本段包 <span leaf=""/>；已有的 <span leaf="" style="..."> 结构
-        （含行内代码）保持原样。返回扁平化的 HTML 字符串。"""
-        if not text:
-            return ''
-        if line_height is None:
-            # 列表项：普通文本片段用 <b style="font-weight:normal"><span leaf=""> 包裹，
-            # 避免作为 <li> 的纯文本子节点被微信编辑器自动组织到 <section> 中。
-            # 已有的 HTML 标签（如行内代码 <b>）保持原样。
-            if '<' not in text:
-                return f'<b style="font-weight:normal"><span leaf="">{text}</span></b>'
-            parts = []
-            i = 0
-            while i < len(text):
-                if text[i] == '<':
-                    # 跳过完整的 <b>...</b> 结构（行内代码）
-                    if text[i:i+2] == '<b' and (i+2 >= len(text) or text[i+2] in ' >'):
-                        close_tag = text.find('</b>', i)
-                        if close_tag != -1:
-                            parts.append(text[i:close_tag+4])
-                            i = close_tag + 4
-                            continue
-                    # 跳过完整的 <strong>...</strong> 结构
-                    if text[i:i+8] == '<strong' and (i+8 >= len(text) or text[i+8] in ' >'):
-                        close_tag = text.find('</strong>', i)
-                        if close_tag != -1:
-                            parts.append(text[i:close_tag+9])
-                            i = close_tag + 9
-                            continue
-                    # 其他标签（开标签或闭标签）保持原样
-                    tag_close = text.find('>', i)
-                    if tag_close != -1:
-                        parts.append(text[i:tag_close+1])
-                        i = tag_close + 1
-                    else:
-                        parts.append(f'<b style="font-weight:normal"><span leaf="">{text[i]}</span></b>')
-                        i += 1
-                else:
-                    j = i
-                    while j < len(text) and text[j] != '<':
-                        j += 1
-                    parts.append(f'<b style="font-weight:normal"><span leaf="">{text[i:j]}</span></b>')
-                    i = j
-            return ''.join(parts)
-        base = f'line-height:{line_height};letter-spacing:2px'
-        if '<' not in text:
-            if normal_weight:
-                return f'<span leaf="" style="font-weight: normal;{base}">{text}</span>'
-            return f'<span leaf="" style="{base}">{text}</span>'
-        parts = []
-        i = 0
-        while i < len(text):
-            if text[i] == '<':
-                # 跳过已有的 <span leaf=""...> ... </span> 结构（含行内代码）
-                if text[i:i+12] == '<span leaf="':
-                    close_tag = text.find('</span>', i)
-                    if close_tag != -1:
-                        parts.append(text[i:close_tag+7])
-                        i = close_tag + 7
-                        continue
-                # 其他标签（如 <b>、<a>、<img> 等）保持原样
-                tag_close = text.find('>', i)
-                if tag_close != -1:
-                    parts.append(text[i:tag_close+1])
-                    i = tag_close + 1
-                else:
-                    if normal_weight:
-                        parts.append(f'<span leaf="" style="font-weight: normal;{base}">{text[i]}</span>')
-                    else:
-                        parts.append(f'<span leaf="" style="{base}">{text[i]}</span>')
-                    i += 1
-            else:
-                j = i
-                while j < len(text) and text[j] != '<':
-                    j += 1
-                if normal_weight:
-                    parts.append(f'<span leaf="" style="font-weight: normal;{base}">{text[i:j]}</span>')
-                else:
-                    parts.append(f'<span leaf="" style="{base}">{text[i:j]}</span>')
-                i = j
-        return ''.join(parts)
-
-    def _replace_bold(text):
-        import re as _re
-        _CJK_PUNCT = set('。，、；：！？"」』")])』》】–—…')
-        matches = list(_re.finditer(r'\*\*([^\*]+)\*\*', text))
-        if not matches:
-            return _split_to_leaf_spans(text)
-        # 从后往前替换，避免位置偏移
-        parts = []
-        prev_end = len(text)
-        for m in reversed(matches):
-            start, raw_end = m.start(), m.end()
-            bold_text = m.group(1)
-            end = raw_end
-            # 检查 end 后是否紧跟全角标点
-            if end < len(text) and text[end] in _CJK_PUNCT:
-                punct = text[end]
-                end += 1
-                # 继续匹配后续文本，遇到 '<' 时跳过整个标签（保留标签内容）
-                rest_parts = []
-                while end < len(text) and text[end] != '\n':
-                    if text[end:end+2] == '**':
-                        # 遇到下一个 ** 加粗标记，停止吞入，
-                        # 清空已吞入的文本，只保留全角标点本身。
-                        # 回退 end 到 raw_end，确保中间文本不被吞掉。
-                        rest_parts = []
-                        end = raw_end
-                        break
-                    if text[end] == '<':
-                        # 跳过整个 HTML 标签
-                        tag_close = text.find('>', end)
-                        if tag_close != -1:
-                            rest_parts.append(text[end:tag_close+1])
-                            end = tag_close + 1
-                        else:
-                            break
-                    else:
-                        rest_parts.append(text[end])
-                        end += 1
-                rest = ''.join(rest_parts)
-                extra_content = punct + rest
-                # 如果 end 被回退到 raw_end（遇到 **），标点留在中间文本中，
-                # 不放入 <b> 内，避免重复。
-                if extra_content and end != raw_end:
-                    extra_html = _split_to_leaf_spans(extra_content, normal_weight=True)
-                else:
-                    extra_html = ''
-            else:
-                extra_html = ''
-            # <b> 后的文本，扁平化拆分，避免 <span leaf=""> 嵌套 <span style="">
-            after = text[end:prev_end]
-            if after:
-                parts.append(_split_to_leaf_spans(after))
-            # 构建 <strong> 内部的 inner
-            # 列表项中 bold_text 直接放入 <strong>，不额外包裹，
-            # 避免 <b style="font-weight:normal"> 覆盖 <strong> 的加粗效果
-            if line_height is None:
-                inner = bold_text
-            else:
-                inner = _split_to_leaf_spans(bold_text)
-            if extra_html:
-                inner += extra_html
-            parts.append(
-                f'<strong style="color:{bold_color}">'
-                f'{inner}</strong>'
-            )
-            prev_end = start
-        # 最前面的文本，扁平化拆分
-        before = text[:prev_end]
-        if before:
-            parts.append(_split_to_leaf_spans(before))
-        parts.reverse()
-        return ''.join(parts)
-
-    return _replace_bold(text)
-
+    return text
 
 def _split_table_row(row):
     """拆分表格行，保护行内代码（`...`）中的管道符不被误拆"""
@@ -663,21 +502,21 @@ def render_table(rows, s):
     bold_color = s.get("bold", "#333")
     base = 'padding:10px 12px;border:1px solid #ddd'
     text_size = s.get("text_font_size", "15px")
-    html = f'<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:{text_size}">\n'
+    html = f'<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:{text_size};color:#555555">\n'
 
     html += '  <thead>\n'
     html += '    <tr>\n'
     for h in headers:
-        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{bold_color};font-size:{text_size}">{format_text(h, s, line_height="1.75")}</th>\n'
+        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:#555555;font-size:{text_size}">{format_text(h, s)}</th>\n'
     html += '    </tr>\n'
     html += '  </thead>\n'
 
-    html += '  <tbody style="padding:10px 12px">\n'
+    html += '  <tbody>\n'
     for i, row in enumerate(data_rows):
         bg = '#fff' if i % 2 == 0 else '#fafafa'
         html += '    <tr>\n'
         for cell in row:
-            html += f'      <td style="{base};background:{bg}">{format_text(cell, s, line_height="1.75")}</td>\n'
+            html += f'      <td style="{base};background:{bg}">{format_text(cell, s)}</td>\n'
         html += '    </tr>\n'
     html += '  </tbody>\n'
     html += '</table>\n'
@@ -687,17 +526,17 @@ def render_table(rows, s):
 
 def render_blockquote(text, s):
     """渲染引用块 —— 每行用独立 <p> 分段，避免 <br> 被转义"""
-    text_size = s.get("text_font_size", "15px")
+    text_size = s.get("text_font_size", "16px")
     lines = text.split('\n')
     parts = []
     for line in lines:
         escaped = escape_html(line)
-        formatted = format_text(escaped, s, line_height="1.9")
+        formatted = format_text(escaped, s)
         parts.append(
-            f'<p style="margin:0 0 8px 0;font-size:{text_size};font-style:italic;color:#888;line-height:1.9">{formatted}</p>'
+            f'<p style="margin:8px 0;font-size:{text_size};font-style:italic;color:#888;line-height:1.75">{formatted}</p>'
         )
     # 去掉最后一行多余的底部 margin
-    parts[-1] = parts[-1].replace('margin:0 0 8px 0', 'margin:0')
+    parts[-1] = parts[-1].replace('margin:8px 0', 'margin:8px 0 0 0')
     html = (
         f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8;'
         f'border-left:4px solid {s["accent"]}">'
@@ -715,8 +554,14 @@ def _token_to_css_class(ttype):
     # 关键字
     if ttype in Token.Keyword:
         return "code-snippet__keyword"
+    # 标签名（HTML/XML 等）
+    if ttype in Token.Name.Tag:
+        return "code-snippet__keyword"
     # 函数名、类名
     if ttype in Token.Name.Function or ttype in Token.Name.Class:
+        return "code-snippet__title"
+    # 属性名
+    if ttype in Token.Name.Attribute:
         return "code-snippet__title"
     # 字符串
     if ttype in Token.String:
@@ -730,7 +575,16 @@ def _token_to_css_class(ttype):
     # 内置函数/类型
     if ttype in Token.Name.Builtin:
         return "code-snippet__built_in"
-    # 普通文本、标点、空白等 — 不高亮
+    # 变量名、标识符
+    if ttype in Token.Name:
+        return "code-snippet__built_in"
+    # 操作符
+    if ttype in Token.Operator:
+        return "code-snippet__subst"
+    # 标点符号
+    if ttype in Token.Punctuation:
+        return "code-snippet__subst"
+    # 普通文本、空白等 — 不高亮
     return None
 
 
@@ -820,9 +674,9 @@ def render_ending(s):
     if not lines:
         return ""
 
-    base_style = 'font-size:12px;color:#888;letter-spacing:0.5px;line-height:1.9'
+    base_style = 'font-size:12px;color:#888;line-height:1.75'
     lines_html = ''.join(
-        f'<p style="margin:0 0 10px 0">{line}</p>'
+        f'<p style="margin:8px 0">{line}</p>'
         for line in lines
     )
     return (
@@ -842,7 +696,7 @@ def render_footer(s):
     caption = s.get("caption", "#a89880")
     return (
         f'<section style="border-top:2px solid {rule};margin:16px 0 0 0;padding:10px 0 0 0;text-align:center">'
-        f'<p style="margin:0;font-size:11px;color:{caption};letter-spacing:1px">{escape_html(footer_text)}</p>'
+        f'<p style="margin:0;font-size:11px;color:{caption}">{escape_html(footer_text)}</p>'
         f'</section>'
     )
 
@@ -855,30 +709,32 @@ def _render_list_block(block, s):
 
     if list_type == "ol":
         tag = "ol"
-        list_style = f'margin:0 0 14px 0;padding-left:24px;font-size:{text_size}'
+        list_style = f'margin:8px 0;padding-left:24px;font-size:{text_size};color:#555555'
         first_value = block["items"][0].get("value") if block.get("items") else None
         if isinstance(first_value, int) and first_value > 0:
             list_attrs = f' start="{first_value}"'
     elif list_type == "task":
         tag = "ul"
-        list_style = f'margin:0 0 14px 0;padding-left:24px;list-style:none;font-size:{text_size}'
+        list_style = f'margin:8px 0;padding-left:24px;list-style:none;font-size:{text_size};color:#555555'
     else:
         tag = "ul"
-        list_style = f'margin:0 0 14px 0;padding-left:24px;font-size:{text_size}'
+        list_style = f'margin:8px 0;padding-left:24px;font-size:{text_size};color:#555555'
 
     items_html = []
     for item in block["items"]:
         item_text = item["text"]
         formatted = format_text(item_text, s)
 
-        # 任务列表渲染
         if list_type == "task":
             checked = item.get("checked", False)
             checkbox = "☑" if checked else "☐"
             color = "#999" if checked else "#333"
-            li_content = f'<span style="color:{color};margin-right:6px;font-size:{text_size}">{checkbox}</span>{formatted}'
+            li_content = f'<span style="color:{color};margin-right:6px">{checkbox}</span>{formatted}'
         else:
             li_content = formatted
+
+        # 列表项内容包裹在 <p> 中，避免微信编辑器将 <strong> 与后续文本拆分为不同块
+        li_content = f'<p style="margin:0;line-height:1.75">{li_content}</p>'
 
         # 嵌套子列表
         children_html = ""
@@ -896,14 +752,9 @@ def _render_list_block(block, s):
             if isinstance(marker_value, int) and marker_value > 0:
                 li_attrs = f' value="{marker_value}"'
 
-        if children_html:
-            items_html.append(
-                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9;font-size:{text_size};letter-spacing:2px">{li_content}{children_html}</li>'
-            )
-        else:
-            items_html.append(
-                f'<li{li_attrs} style="margin:0 0 6px 0;line-height:1.9;font-size:{text_size};letter-spacing:2px">{li_content}</li>'
-            )
+        items_html.append(
+            f'<li{li_attrs} style="margin:4px 0;line-height:1.75">{li_content}{children_html}</li>'
+        )
 
     # 去除 \\n：微信编辑器会把 HTML 元素间的换行解释为新列表项，产生多余带点空行
     return f'<{tag}{list_attrs} style="{list_style}">' + ''.join(items_html) + f'</{tag}>'
@@ -917,7 +768,7 @@ def render_h2(text, s, index):
     """渲染 H2（支持多种样式）"""
     style = s.get("h2_style", "pill")
     accent = s.get("accent", "#333")
-    h2_size = s.get("h2_font_size", "18px")
+    h2_size = s.get("h2_font_size", "20px")
     rule = s.get("rule", "#ddd")
     bold_color = s.get("bold", "#333")
     badge_bg = s.get("h2_badge_bg", "#f7b731")
@@ -980,7 +831,7 @@ def render_h2(text, s, index):
     return (
         f'<h2 style="margin:28px auto 18px;padding:8px 24px;font-size:{h2_size};font-weight:bold;color:#fff;'
         f'background:{accent};text-align:center;display:block;'
-        f'width:fit-content;line-height:1.6;box-shadow:0 2px 6px rgba(0,0,0,0.12)">'
+        f'width:fit-content;line-height:1.6">'
         f'{label}</h2>'
     )
 
@@ -998,18 +849,18 @@ def generate_html(data, s):
             h2_index += 1
             content_parts.append(render_h2(text, s, h2_index))
         elif btype == "heading" and block["level"] == 3:
-            h3_color = s.get("h3_color", "#333")
-            h3_size = s.get("h3_font_size", "17px")
+            h3_color = s.get("h3_color", "#000000")
+            h3_size = s.get("h3_font_size", "20px")
             content_parts.append(
                 f'<p style="margin:22px 0 12px 0;font-size:{h3_size};font-weight:bold;color:{h3_color};line-height:1.5">'
-                f'{format_text(text, s, line_height="1.5")}</p>'
+                f'{format_text(text, s)}</p>'
             )
         elif btype == "heading" and block["level"] == 4:
-            h4_color = s.get("h4_color", "#555")
-            h4_size = s.get("h4_font_size", "16px")
+            h4_color = s.get("h4_color", "#000000")
+            h4_size = s.get("h4_font_size", "18px")
             content_parts.append(
                 f'<p style="margin:18px 0 10px 0;font-size:{h4_size};font-weight:bold;color:{h4_color};line-height:1.5">'
-                f'{format_text(text, s, line_height="1.5")}</p>'
+                f'{format_text(text, s)}</p>'
             )
         elif btype == "blockquote":
             content_parts.append(render_blockquote(text, s))
@@ -1026,12 +877,13 @@ def generate_html(data, s):
                 f'</p>'
             )
         elif btype == "para":
-            formatted = format_text(text, s, line_height="1.75")
+            formatted = format_text(text, s)
             p_indent = s.get("p_indent", "0")
             indent_css = f';text-indent:{p_indent}' if p_indent and p_indent != "0" else ''
-            text_size = s.get("text_font_size", "15px")
+            text_color = s.get("text", "#555555")
+            text_size = s.get("text_font_size", "16px")
             content_parts.append(
-                f'<p style="margin:0 0 14px 0;font-size:{text_size};line-height:1.75{indent_css}">{formatted}</p>'
+                f'<p style="margin:8px 0;font-size:{text_size};color:{text_color};line-height:1.75{indent_css}">{formatted}</p>'
             )
         elif btype in ("ol", "ul", "task"):
             content_parts.append(_render_list_block(block, s))
@@ -1051,25 +903,25 @@ ARTICLE_DEFAULTS = {
     "bg": "#ffffff",
     "content_bg": "transparent",
     "font_family": "-apple-system,'PingFang SC','Microsoft YaHei',sans-serif",
-    "text": "rgb(85,85,85)",
+    "text": "#555555",
     "accent": "rgb(198,110,73)",
     "hero_bg": "rgb(198,110,73)",
     "hero_title_color": "#ffffff",
-    "bold": "rgb(51,51,51)",
+    "bold": "#555555",
     "rule": "#ddd",
     "caption": "#888",
     "title_font_size": "22px",
-    "text_font_size": "15px",
-    "h2_font_size": "18px",
-    "h3_font_size": "17px",
-    "h4_font_size": "16px",
+    "text_font_size": "16px",
+    "h2_font_size": "20px",
+    "h3_font_size": "20px",
+    "h4_font_size": "18px",
     "h2_style": "pill",
     "h2_badge_bg": "#f7b731",
     "h2_badge_text": "#ffffff",
     "h2_index_bg": "rgb(198,110,73)",
     "h2_index_text": "#ffffff",
-    "h3_color": "#333",
-    "h4_color": "#555",
+    "h3_color": "#000000",
+    "h4_color": "#000000",
     "h2_frame_bg": "#f8f0fb",
     "h2_frame_border": "rgb(198,110,73)",
     "h2_frame_border_width": "5px",
@@ -1198,14 +1050,14 @@ ARTICLE_THEMES = {
         "rule": "#eeeeee",
         "caption": "#888888",
         "title_font_size": "22px",
-        "text_font_size": "15px",
+        "text_font_size": "16px",
         "h2_font_size": "17px",
         "h2_style": "framed_pill",
         "h2_frame_bg": "#f8f0fb",
         "h2_frame_border": "#9b59b6",
         "h2_frame_border_width": "5px",
         "h2_frame_radius": "4px",
-        "h3_color": "#2e7d32",
+        "h3_color": "#000000",
         "p_indent": "2em",
         "hero_style": "minimal",
         "cover_label": "",

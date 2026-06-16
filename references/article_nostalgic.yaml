@@ -5,8 +5,8 @@ style:
     article:
         bg: "#f0e4c8"
         card: "#f5ecd5"
-        dark: "#3d2b1f"
-        heading: "#2c1a0e"
+        text: "#3d2b1f"
+        bold: "#2c1a0e"
         accent: "#8b5e3c"
         rule: "#c9b99a"
         caption: "#a08c6a"
