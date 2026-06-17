@@ -930,16 +930,19 @@ def generate_html(data, s):
             h2_index += 1
             content_parts.append(render_h2(text, s, h2_index))
         elif btype == "heading" and block["level"] == 3:
+            h3_size = s.get("h3_font_size", "20px")
+            h3_color = s.get("h3_color", "#000000")
             content_parts.append(
                 f'<p style="margin:22px 0 12px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
-                f'<span leaf=""><span textstyle="" style="font-size:20px;letter-spacing:2px;color:#000000;font-weight:bold">'
+                f'<span leaf=""><span textstyle="" style="font-size:{h3_size};letter-spacing:2px;color:{h3_color};font-weight:bold">'
                 f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "heading" and block["level"] == 4:
             h4_size = s.get("h4_font_size", "18px")
+            h4_color = s.get("h4_color", "#000000")
             content_parts.append(
                 f'<p style="margin:18px 0 10px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
-                f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:2px;color:#000000;font-weight:bold">'
+                f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:2px;color:{h4_color};font-weight:bold">'
                 f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "blockquote":
