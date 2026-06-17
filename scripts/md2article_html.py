@@ -467,8 +467,10 @@ def _tokenize_inline(text, s):
     return tokens
 
 
-def _render_tokens(tokens, s):
-    """将 token 列表渲染为 HTML（每个片段独立包裹）。"""
+def _render_tokens(tokens, s, is_inside=False):
+    """将 token 列表渲染为 HTML（每个片段独立包裹）。
+    is_inside=True 表示当前处于 bold/link 等样式节点内部，text 直接输出 escaped 文本，
+    不再额外包裹 <span textstyle="">，避免覆盖外层 font-weight 等样式。"""
     parts = []
     accent = s["accent"]
 
@@ -477,11 +479,15 @@ def _render_tokens(tokens, s):
         if ttype == 'text':
             content = escape_html(token[1])
             if content:
-                parts.append(
-                    f'<span leaf=""><span textstyle="" style="letter-spacing:2px">{content}</span></span>'
-                )
+                if is_inside:
+                    # bold/link 内部：直接输出文本，不额外包裹，防止覆盖外层样式
+                    parts.append(content)
+                else:
+                    parts.append(
+                        f'<span leaf=""><span textstyle="" style="letter-spacing:2px">{content}</span></span>'
+                    )
         elif ttype == 'bold':
-            inner_html = _render_tokens(token[1], s)
+            inner_html = _render_tokens(token[1], s, is_inside=True)
             parts.append(
                 f'<span leaf=""><span textstyle="" style="letter-spacing:2px;font-weight:bold">'
                 f'{inner_html}</span></span>'
@@ -495,9 +501,9 @@ def _render_tokens(tokens, s):
                 f'</span>'
             )
         elif ttype == 'link':
-            inner_html = _render_tokens(token[1], s)
+            inner_html = _render_tokens(token[1], s, is_inside=True)
             parts.append(
-                f'<a href="{token[2]}" style="color:{accent};text-decoration:none">'
+                f'<a href="{token[2]}" style="color:{accent};text-decoration:none;letter-spacing:2px">'
                 f'{inner_html}</a>'
             )
         elif ttype == 'img':
@@ -924,18 +930,17 @@ def generate_html(data, s):
             h2_index += 1
             content_parts.append(render_h2(text, s, h2_index))
         elif btype == "heading" and block["level"] == 3:
-            h3_size = s.get("h3_font_size", "20px")
             content_parts.append(
                 f'<p style="margin:22px 0 12px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
-                f'<span leaf=""><span textstyle="" style="font-size:{h3_size};letter-spacing:2px;color:#000000;font-weight:bold">'
-                f'{format_text(text, s)}</span></span></p>'
+                f'<span leaf=""><span textstyle="" style="font-size:20px;letter-spacing:2px;color:#000000;font-weight:bold">'
+                f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "heading" and block["level"] == 4:
             h4_size = s.get("h4_font_size", "18px")
             content_parts.append(
                 f'<p style="margin:18px 0 10px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
                 f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:2px;color:#000000;font-weight:bold">'
-                f'{format_text(text, s)}</span></span></p>'
+                f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "blockquote":
             content_parts.append(render_blockquote(text, s))
