@@ -707,17 +707,23 @@ def update_draft(access_token, media_id, title, html_content, thumb_media_id, co
 
 
 def unescape_code_blocks(html):
-    """对 <pre class="code-snippet__js"> 内的 HTML 实体做反向解码。
+    """对 <pre class="code-snippet__js"> 内的代码实体做选择性解码。
 
-    微信 code-snippet 组件直接读取 HTML 源码文本，
-    不会解码 &lt; / &gt; 等实体，因此上传前需要把代码文本中的
-    实体还原为字面字符 < 和 >。
+    微信 code-snippet 组件直接读取 HTML 源码文本，不会解码 &lt; / &gt; 等实体，
+    因此上传前需要把代码文本中的 &lt; 和 &gt; 还原为字面字符，否则代码中显示为实体文本。
+
+    关键：保留 &nbsp; 不被解码，防止编辑器将前导空格当作普通 whitespace trim 掉。
     """
-    import html as _html
     import re
 
     def _unescape_pre(match):
-        return _html.unescape(match.group(0))
+        text = match.group(0)
+        # 只还原代码中必须显示为字面字符的实体，保留 &nbsp; 防止空格被 trim
+        text = text.replace('&lt;', '<')
+        text = text.replace('&gt;', '>')
+        text = text.replace('&amp;', '&')
+        # 注意：不替换 &nbsp;，保留为实体文本
+        return text
 
     pattern = r'<pre class="code-snippet__js"[^>]*>[\s\S]*?</pre>'
     return re.sub(pattern, _unescape_pre, html)

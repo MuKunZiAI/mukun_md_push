@@ -412,48 +412,114 @@ def escape_html(text):
     return text
 
 
+def _tokenize_inline(text, s):
+    """将文本解析为 token 列表，支持嵌套（粗体、链接可嵌套代码等）。"""
+    tokens = []
+    pos = 0
+
+    while pos < len(text):
+        # 在剩余文本中查找所有匹配
+        matches = []
+
+        # 行内代码（不可嵌套）
+        for m in re.finditer(r'`([^`]+)`', text[pos:]):
+            matches.append((pos + m.start(), pos + m.end(), 'code', m))
+
+        # 行内图片（不可嵌套）
+        for m in re.finditer(r'!\[([^\]]*)\]\(([^)]+)\)', text[pos:]):
+            matches.append((pos + m.start(), pos + m.end(), 'img', m))
+
+        # 粗体（可嵌套代码、图片）
+        for m in re.finditer(r'\*\*([^\*]+)\*\*', text[pos:]):
+            matches.append((pos + m.start(), pos + m.end(), 'bold', m))
+
+        # 链接（可嵌套粗体、代码、图片）
+        for m in re.finditer(r'\[([^\]]+)\]\(([^)]+)\)', text[pos:]):
+            matches.append((pos + m.start(), pos + m.end(), 'link', m))
+
+        if not matches:
+            tokens.append(('text', text[pos:]))
+            break
+
+        # 取最前面的匹配
+        matches.sort(key=lambda x: x[0])
+        start, end, mtype, m = matches[0]
+
+        # 添加 start 之前的文本
+        if start > pos:
+            tokens.append(('text', text[pos:start]))
+
+        if mtype == 'code':
+            tokens.append(('code', m.group(1)))
+        elif mtype == 'img':
+            tokens.append(('img', m.group(1), m.group(2)))
+        elif mtype == 'bold':
+            # 递归处理粗体内部
+            inner_tokens = _tokenize_inline(m.group(1), s)
+            tokens.append(('bold', inner_tokens))
+        elif mtype == 'link':
+            # 递归处理链接文字
+            inner_tokens = _tokenize_inline(m.group(1), s)
+            tokens.append(('link', inner_tokens, m.group(2)))
+
+        pos = end
+
+    return tokens
+
+
+def _render_tokens(tokens, s, is_inside=False):
+    """将 token 列表渲染为 HTML（每个片段独立包裹）。
+    is_inside=True 表示当前处于 bold/link 等样式节点内部，text 直接输出 escaped 文本，
+    不再额外包裹 <span textstyle="">，避免覆盖外层 font-weight 等样式。"""
+    parts = []
+    accent = s["accent"]
+
+    for token in tokens:
+        ttype = token[0]
+        if ttype == 'text':
+            content = escape_html(token[1])
+            if content:
+                if is_inside:
+                    # bold/link 内部：直接输出文本，不额外包裹，防止覆盖外层样式
+                    parts.append(content)
+                else:
+                    parts.append(
+                        f'<span leaf=""><span textstyle="" style="letter-spacing:2px">{content}</span></span>'
+                    )
+        elif ttype == 'bold':
+            inner_html = _render_tokens(token[1], s, is_inside=True)
+            parts.append(
+                f'<span leaf=""><span textstyle="" style="letter-spacing:2px;font-weight:bold">'
+                f'{inner_html}</span></span>'
+            )
+        elif ttype == 'code':
+            content = escape_html(token[1])
+            parts.append(
+                f'<span leaf="" style="background:rgba(129,139,152,0.12);font-family:monospace;'
+                f'font-size:13.6px;white-space:break-spaces;display:inline !important">'
+                f'<span textstyle="" style="font-size:16px;color:{accent}">{content}</span>'
+                f'</span>'
+            )
+        elif ttype == 'link':
+            inner_html = _render_tokens(token[1], s, is_inside=True)
+            parts.append(
+                f'<a href="{token[2]}" style="color:{accent};text-decoration:none;letter-spacing:2px">'
+                f'{inner_html}</a>'
+            )
+        elif ttype == 'img':
+            alt = escape_html(token[1])
+            parts.append(
+                f'<img src="{token[2]}" alt="{alt}" style="max-width:100%;height:auto;vertical-align:middle">'
+            )
+
+    return ''.join(parts)
+
+
 def format_text(text, s, line_height=None):
     """文章文本格式化：粗体、链接、行内代码、图片。
-    扁平化设计：避免不必要的嵌套，只在需要语义化或样式差异时使用标签包裹。
-    line_height 参数保留用于兼容旧接口，但不再产生额外嵌套。"""
-    text = escape_html(text)
-
-    # 行内代码 — 扁平化：使用 <code> 标签，单一内联样式
-    accent = s["accent"]
-    text = re.sub(
-        r'`([^`]+)`',
-        lambda m: f'<code style="font-family:monospace;font-size:13px;background:#f5f5f5;color:{accent};padding:2px 6px;border-radius:3px">{m.group(1)}</code>',
-        text
-    )
-
-    # 内联图片（必须在链接之前处理，避免 ![...](url) 被链接正则误匹配）
-    # 同时在回调中检查匹配位置是否在 <code> 标签内，避免误转换行内代码中的 ![]()
-    def replace_img(m):
-        # 检查是否在 <code> 标签内
-        prefix = text[:m.start()]
-        last_code_open = prefix.rfind('<code')
-        last_code_close = prefix.rfind('</code>')
-        if last_code_open > last_code_close:
-            return m.group(0)  # 在 <code> 内，保持原样
-        alt = m.group(1)
-        src = m.group(2)
-        return f'<img src="{src}" alt="{escape_html(alt)}" style="max-width:100%;height:auto;vertical-align:middle">'
-    text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', replace_img, text)
-
-    # 链接
-    def replace_link(m):
-        return f'<a href="{m.group(2)}" style="color:{accent};text-decoration:none">{m.group(1)}</a>'
-    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_link, text)
-
-    # 粗体 - 扁平化：直接用 <strong> 包裹，不嵌套 span
-    # 注意：不使用 overflow-wrap / max-width，避免微信编辑器将其视为块级元素导致断行
-    bold_color = s.get("bold", "#555555")
-    text = re.sub(r'\*\*([^\*]+)\*\*', lambda m: f'<strong style="color:{bold_color}">{m.group(1)}</strong>', text)
-    # 第二步：后处理——将 <strong>text</strong>： 合并为 <strong>text：</strong>，避免标签边界处微信浏览器断行
-    text = re.sub(r'(<strong style="[^"]*">)([^<]+)</strong>：', lambda m: f'{m.group(1)}{m.group(2)}：</strong>', text)
-
-    return text
-
+    分段式渲染：每个文本片段独立包裹，确保微信编辑器正确识别样式。"""
+    tokens = _tokenize_inline(text, s)
+    return _render_tokens(tokens, s)
 def _split_table_row(row):
     """拆分表格行，保护行内代码（`...`）中的管道符不被误拆"""
     # 记录所有反引号对的位置
@@ -533,7 +599,7 @@ def render_blockquote(text, s):
         escaped = escape_html(line)
         formatted = format_text(escaped, s)
         parts.append(
-            f'<p style="margin:8px 0;font-size:{text_size};font-style:italic;color:#888;line-height:1.75">{formatted}</p>'
+            f'<p style="margin:8px 0;font-size:{text_size};font-style:italic;color:#888;line-height:1.75;letter-spacing:0.034em">{formatted}</p>'
         )
     # 去掉最后一行多余的底部 margin
     parts[-1] = parts[-1].replace('margin:8px 0', 'margin:8px 0 0 0')
@@ -596,14 +662,26 @@ def highlight_code(code, lang=None):
     if not code:
         return []
 
+    # 去掉代码块的最小公共缩进（保留代码行内部相对缩进）
+    code_lines = code.split('\n')
+    _strip_chars = ' \t\n\r\x0b\x0c\xa0'
+    indents = [len(line) - len(line.lstrip(_strip_chars)) for line in code_lines if line.strip(_strip_chars)]
+    if indents:
+        min_indent = min(indents)
+        if min_indent > 0:
+            code = '\n'.join(
+                line[min_indent:] if line.strip(_strip_chars) else line
+                for line in code_lines
+            )
+
     # 获取 lexer：有指定语言则直接用，否则回退为纯文本（不猜测，避免误判）
     try:
         if lang:
-            lexer = get_lexer_by_name(lang, stripall=True)
+            lexer = get_lexer_by_name(lang)
         else:
-            lexer = get_lexer_by_name("text", stripall=True)
+            lexer = get_lexer_by_name("text")
     except Exception:
-        lexer = get_lexer_by_name("text", stripall=True)
+        lexer = get_lexer_by_name("text")
 
     lines = []
     current_line = []
@@ -643,19 +721,22 @@ def render_code_block(code, lang=None):
     # 逐行渲染
     code_lines_html = []
     for line_tokens in lines_tokens:
-        if not line_tokens:
-            # 空行 — 零宽占位符
-            code_lines_html.append('<code><span leaf="">&#8203;</span></code>')
+        # 渲染 token（保留前导空白在文本中）
+        parts = []
+        for text, css_class in line_tokens:
+            escaped = escape_html(text)
+            # 行内空白：用 &nbsp; 保留，避免编辑器折叠
+            escaped = escaped.replace(' ', '&nbsp;').replace('\xa0', '&nbsp;')
+            if css_class:
+                parts.append(f'<span class="{css_class}">{escaped}</span>')
+            else:
+                parts.append(escaped)
+
+        if parts:
+            line_html = '<span leaf="">' + ''.join(parts) + '</span>'
         else:
-            parts = []
-            for text, css_class in line_tokens:
-                escaped = escape_html(text)
-                if css_class:
-                    parts.append(f'<span class="{css_class}">{escaped}</span>')
-                else:
-                    parts.append(escaped)
-            line_html = ''.join(parts)
-            code_lines_html.append(f'<code><span leaf="">{line_html}</span></code>')
+            line_html = '<span leaf=""></span>'
+        code_lines_html.append(f'<code>{line_html}</code>')
 
     lang_attr = f' data-lang="{escape_html(lang)}"' if lang else ''
 
@@ -674,7 +755,7 @@ def render_ending(s):
     if not lines:
         return ""
 
-    base_style = 'font-size:12px;color:#888;line-height:1.75'
+    base_style = 'font-size:12px;color:#888;line-height:1.75;letter-spacing:0.034em'
     lines_html = ''.join(
         f'<p style="margin:8px 0">{line}</p>'
         for line in lines
@@ -849,18 +930,17 @@ def generate_html(data, s):
             h2_index += 1
             content_parts.append(render_h2(text, s, h2_index))
         elif btype == "heading" and block["level"] == 3:
-            h3_color = s.get("h3_color", "#000000")
-            h3_size = s.get("h3_font_size", "20px")
             content_parts.append(
-                f'<p style="margin:22px 0 12px 0;font-size:{h3_size};font-weight:bold;color:{h3_color};line-height:1.5">'
-                f'{format_text(text, s)}</p>'
+                f'<p style="margin:22px 0 12px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
+                f'<span leaf=""><span textstyle="" style="font-size:20px;letter-spacing:2px;color:#000000;font-weight:bold">'
+                f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "heading" and block["level"] == 4:
-            h4_color = s.get("h4_color", "#000000")
             h4_size = s.get("h4_font_size", "18px")
             content_parts.append(
-                f'<p style="margin:18px 0 10px 0;font-size:{h4_size};font-weight:bold;color:{h4_color};line-height:1.5">'
-                f'{format_text(text, s)}</p>'
+                f'<p style="margin:18px 0 10px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
+                f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:2px;color:#000000;font-weight:bold">'
+                f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "blockquote":
             content_parts.append(render_blockquote(text, s))
@@ -883,7 +963,7 @@ def generate_html(data, s):
             text_color = s.get("text", "#555555")
             text_size = s.get("text_font_size", "16px")
             content_parts.append(
-                f'<p style="margin:8px 0;font-size:{text_size};color:{text_color};line-height:1.75{indent_css}">{formatted}</p>'
+                f'<p style="margin:8px 0;font-size:{text_size};color:{text_color};line-height:1.75;letter-spacing:0.034em{indent_css}">{formatted}</p>'
             )
         elif btype in ("ol", "ul", "task"):
             content_parts.append(_render_list_block(block, s))
