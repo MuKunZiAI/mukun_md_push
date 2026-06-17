@@ -596,14 +596,25 @@ def highlight_code(code, lang=None):
     if not code:
         return []
 
+    # 去掉代码块的最小公共缩进（保留代码行内部相对缩进）
+    code_lines = code.split('\n')
+    indents = [len(line) - len(line.lstrip()) for line in code_lines if line.strip()]
+    if indents:
+        min_indent = min(indents)
+        if min_indent > 0:
+            code = '\n'.join(
+                line[min_indent:] if line.strip() else line
+                for line in code_lines
+            )
+
     # 获取 lexer：有指定语言则直接用，否则回退为纯文本（不猜测，避免误判）
     try:
         if lang:
-            lexer = get_lexer_by_name(lang, stripall=True)
+            lexer = get_lexer_by_name(lang)
         else:
-            lexer = get_lexer_by_name("text", stripall=True)
+            lexer = get_lexer_by_name("text")
     except Exception:
-        lexer = get_lexer_by_name("text", stripall=True)
+        lexer = get_lexer_by_name("text")
 
     lines = []
     current_line = []
@@ -650,6 +661,8 @@ def render_code_block(code, lang=None):
             parts = []
             for text, css_class in line_tokens:
                 escaped = escape_html(text)
+                # 微信编辑器保存时会 trim 普通空格，用 &nbsp; 保留缩进和行内空白
+                escaped = escaped.replace(' ', '&nbsp;')
                 if css_class:
                     parts.append(f'<span class="{css_class}">{escaped}</span>')
                 else:

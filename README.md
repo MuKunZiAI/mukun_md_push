@@ -780,7 +780,6 @@ mukun_md_push/
 ### 2026-05-23
 
 - **CSS 内联优化**：将 `text-indent`、`font-size`、`color`、`line-height` 等可继承属性提升到父级 `<body>`/`<section>`，减少重复声明。日报模式节省 10.4%，AI 模式节省 4.5%，长文模式节省 6.2%
-- **超长文章自动拆分**：HTML 超过 20000 字符时按段落边界自动拆分为多篇，合并到同一个草稿推送，标题自动追加（上/中/下）后缀，智能截断保留后缀（`_truncate_title()`）
 - **样式配置外部化**：`md2wechat_html.py` 新增 `load_style_config()` 从 `~/.md_push_wechat/config.yaml` 读取 `style` 节点覆盖内置默认值，支持 daily/ai/essay 三种模式独立配色，纯字符串解析 YAML 不引入额外依赖
 - **`--config` 参数**：`md2wechat_html.py` 支持通过 `--config <path>` 指定任意配色配置文件
 - **修复代码块缩进丢失**：`parse_essay()` 收集代码块行时改用 `raw`（保留行首空格），修复 YAML、文件树等缩进代码渲染后缩进丢失的问题
