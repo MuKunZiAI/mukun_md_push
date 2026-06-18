@@ -58,7 +58,7 @@ pre.code-snippet__js code{display:block;font-family:inherit}
 </section>
 
 <!-- 正文区域 -->
-<section style="font-size:__TEXT_FONT_SIZE__;line-height:1.75;padding:0 4px 20px;color:__TEXT_COLOR__;background:__CONTENT_BG__;letter-spacing:0.034em">
+<section style="font-size:__TEXT_FONT_SIZE__;line-height:2em;padding:0 4px 20px;color:__TEXT_COLOR__;background:__CONTENT_BG__;letter-spacing:1px">
 __CONTENT__
 </section>
 
@@ -484,12 +484,12 @@ def _render_tokens(tokens, s, is_inside=False):
                     parts.append(content)
                 else:
                     parts.append(
-                        f'<span leaf=""><span textstyle="" style="letter-spacing:2px">{content}</span></span>'
+                        f'<span leaf=""><span textstyle="" style="letter-spacing:1px">{content}</span></span>'
                     )
         elif ttype == 'bold':
             inner_html = _render_tokens(token[1], s, is_inside=True)
             parts.append(
-                f'<span leaf=""><span textstyle="" style="letter-spacing:2px;font-weight:bold">'
+                f'<span leaf=""><span textstyle="" style="letter-spacing:1px;font-weight:bold">'
                 f'{inner_html}</span></span>'
             )
         elif ttype == 'code':
@@ -503,7 +503,7 @@ def _render_tokens(tokens, s, is_inside=False):
         elif ttype == 'link':
             inner_html = _render_tokens(token[1], s, is_inside=True)
             parts.append(
-                f'<a href="{token[2]}" style="color:{accent};text-decoration:none;letter-spacing:2px">'
+                f'<a href="{token[2]}" style="color:{accent};text-decoration:none;letter-spacing:1px">'
                 f'{inner_html}</a>'
             )
         elif ttype == 'img':
@@ -599,10 +599,10 @@ def render_blockquote(text, s):
         escaped = escape_html(line)
         formatted = format_text(escaped, s)
         parts.append(
-            f'<p style="margin:8px 0;font-size:{text_size};font-style:italic;color:#888;line-height:1.75;letter-spacing:0.034em">{formatted}</p>'
+            f'<p style="margin:0 0 14px 0;font-size:{text_size};font-style:italic;color:#888;line-height:2em;letter-spacing:1px">{formatted}</p>'
         )
     # 去掉最后一行多余的底部 margin
-    parts[-1] = parts[-1].replace('margin:8px 0', 'margin:8px 0 0 0')
+    parts[-1] = parts[-1].replace('margin:0 0 14px 0', 'margin:0 0 0 0')
     html = (
         f'<section style="margin:16px 0;padding:14px 16px;background:#f8f8f8;'
         f'border-left:4px solid {s["accent"]}">'
@@ -815,7 +815,7 @@ def _render_list_block(block, s):
             li_content = formatted
 
         # 列表项内容包裹在 <p> 中，避免微信编辑器将 <strong> 与后续文本拆分为不同块
-        li_content = f'<p style="margin:0;line-height:1.75">{li_content}</p>'
+        li_content = f'<p style="margin:0;line-height:2em">{li_content}</p>'
 
         # 嵌套子列表
         children_html = ""
@@ -834,7 +834,7 @@ def _render_list_block(block, s):
                 li_attrs = f' value="{marker_value}"'
 
         items_html.append(
-            f'<li{li_attrs} style="margin:4px 0;line-height:1.75">{li_content}{children_html}</li>'
+            f'<li{li_attrs} style="margin:4px 0;line-height:2em">{li_content}{children_html}</li>'
         )
 
     # 去除 \\n：微信编辑器会把 HTML 元素间的换行解释为新列表项，产生多余带点空行
@@ -933,16 +933,16 @@ def generate_html(data, s):
             h3_size = s.get("h3_font_size", "20px")
             h3_color = s.get("h3_color", "#000000")
             content_parts.append(
-                f'<p style="margin:22px 0 12px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
-                f'<span leaf=""><span textstyle="" style="font-size:{h3_size};letter-spacing:2px;color:{h3_color};font-weight:bold">'
+                f'<p style="margin:22px 0 12px 0;font-size:16px;color:rgb(85,85,85);line-height:2em;letter-spacing:1px">'
+                f'<span leaf=""><span textstyle="" style="font-size:{h3_size};letter-spacing:1px;color:{h3_color};font-weight:bold">'
                 f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "heading" and block["level"] == 4:
             h4_size = s.get("h4_font_size", "18px")
             h4_color = s.get("h4_color", "#000000")
             content_parts.append(
-                f'<p style="margin:18px 0 10px 0;font-size:16px;color:rgb(85,85,85);line-height:1.75;letter-spacing:0.034em">'
-                f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:2px;color:{h4_color};font-weight:bold">'
+                f'<p style="margin:18px 0 10px 0;font-size:16px;color:rgb(85,85,85);line-height:2em;letter-spacing:1px">'
+                f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:1px;color:{h4_color};font-weight:bold">'
                 f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "blockquote":
@@ -966,7 +966,7 @@ def generate_html(data, s):
             text_color = s.get("text", "#555555")
             text_size = s.get("text_font_size", "16px")
             content_parts.append(
-                f'<p style="margin:8px 0;font-size:{text_size};color:{text_color};line-height:1.75;letter-spacing:0.034em{indent_css}">{formatted}</p>'
+                f'<p style="margin:0 0 14px 0;font-size:{text_size};color:{text_color};line-height:2em;letter-spacing:1px{indent_css}">{formatted}</p>'
             )
         elif btype in ("ol", "ul", "task"):
             content_parts.append(_render_list_block(block, s))
