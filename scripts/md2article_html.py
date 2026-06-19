@@ -593,7 +593,7 @@ def render_table(rows, s):
 
 def render_blockquote(text, s):
     """渲染引用块 —— 每行用独立 <p> 分段，避免 <br> 被转义"""
-    text_size = s.get("text_font_size", "16px")
+    text_size = s.get("blockquote_font_size", "14px")
     lines = text.split('\n')
     parts = []
     for line in lines:
@@ -999,6 +999,7 @@ ARTICLE_DEFAULTS = {
     "caption": "#888",
     "title_font_size": "22px",
     "text_font_size": "16px",
+    "blockquote_font_size": "14px",
     "h2_font_size": "20px",
     "h3_font_size": "20px",
     "h4_font_size": "18px",
