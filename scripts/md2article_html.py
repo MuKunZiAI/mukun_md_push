@@ -568,12 +568,13 @@ def render_table(rows, s):
     bold_color = s.get("bold", "#333")
     base = 'padding:10px 12px;border:1px solid #ddd'
     text_size = s.get("text_font_size", "15px")
-    html = f'<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:{text_size};color:#555555">\n'
+    text_color = s.get("text", "#555555")
+    html = f'<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:{text_size};color:{text_color}">\n'
 
     html += '  <thead>\n'
     html += '    <tr>\n'
     for h in headers:
-        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:#555555;font-size:{text_size}">{format_text(h, s)}</th>\n'
+        html += f'      <th style="{base};background:#f8f8f8;font-weight:bold;color:{text_color};font-size:{text_size}">{format_text(h, s)}</th>\n'
     html += '    </tr>\n'
     html += '  </thead>\n'
 
@@ -787,19 +788,20 @@ def _render_list_block(block, s):
     list_type = block["type"]
     list_attrs = ""
     text_size = s.get("text_font_size", "15px")
+    text_color = s.get("text", "#555555")
 
     if list_type == "ol":
         tag = "ol"
-        list_style = f'margin:8px 0;padding-left:24px;font-size:{text_size};color:#555555'
+        list_style = f'margin:8px 0;padding-left:24px;font-size:{text_size};color:{text_color}'
         first_value = block["items"][0].get("value") if block.get("items") else None
         if isinstance(first_value, int) and first_value > 0:
             list_attrs = f' start="{first_value}"'
     elif list_type == "task":
         tag = "ul"
-        list_style = f'margin:8px 0;padding-left:24px;list-style:none;font-size:{text_size};color:#555555'
+        list_style = f'margin:8px 0;padding-left:24px;list-style:none;font-size:{text_size};color:{text_color}'
     else:
         tag = "ul"
-        list_style = f'margin:8px 0;padding-left:24px;font-size:{text_size};color:#555555'
+        list_style = f'margin:8px 0;padding-left:24px;font-size:{text_size};color:{text_color}'
 
     items_html = []
     for item in block["items"]:
@@ -932,16 +934,18 @@ def generate_html(data, s):
         elif btype == "heading" and block["level"] == 3:
             h3_size = s.get("h3_font_size", "20px")
             h3_color = s.get("h3_color", "#000000")
+            text_color = s.get("text", "#555555")
             content_parts.append(
-                f'<p style="margin:22px 0 12px 0;font-size:16px;color:rgb(85,85,85);line-height:2em;letter-spacing:1px">'
+                f'<p style="margin:22px 0 12px 0;font-size:16px;color:{text_color};line-height:2em;letter-spacing:1px">'
                 f'<span leaf=""><span textstyle="" style="font-size:{h3_size};letter-spacing:1px;color:{h3_color};font-weight:bold">'
                 f'{escape_html(text)}</span></span></p>'
             )
         elif btype == "heading" and block["level"] == 4:
             h4_size = s.get("h4_font_size", "18px")
             h4_color = s.get("h4_color", "#000000")
+            text_color = s.get("text", "#555555")
             content_parts.append(
-                f'<p style="margin:18px 0 10px 0;font-size:16px;color:rgb(85,85,85);line-height:2em;letter-spacing:1px">'
+                f'<p style="margin:18px 0 10px 0;font-size:16px;color:{text_color};line-height:2em;letter-spacing:1px">'
                 f'<span leaf=""><span textstyle="" style="font-size:{h4_size};letter-spacing:1px;color:{h4_color};font-weight:bold">'
                 f'{escape_html(text)}</span></span></p>'
             )
