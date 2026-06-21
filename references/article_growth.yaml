@@ -14,6 +14,8 @@ style:
         title_font_size: "24px"
         text_font_size: "16px"
         h2_font_size: "18px"
+        h3_font_size: "17px"
+        h4_font_size: "16px"
         cover_label: "WEEKLY INSIGHT"
         footer: ""
         h2_style: "badge_block"

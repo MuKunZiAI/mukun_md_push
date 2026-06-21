@@ -1,6 +1,6 @@
 {
   "name": "mukun-md-push-wechat",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "description": "Markdown 转微信公众号 HTML 并推送草稿箱，支持新闻模式和文章模式",
   "main": ".opencode/plugins/mukun-md-push-wechat.js",

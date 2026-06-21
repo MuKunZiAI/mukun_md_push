@@ -5,8 +5,8 @@ style:
     article:
         bg: "#f0e4c8"
         card: "#f5ecd5"
-        dark: "#3d2b1f"
-        heading: "#2c1a0e"
+        text: "#3d2b1f"
+        bold: "#2c1a0e"
         accent: "#8b5e3c"
         rule: "#c9b99a"
         caption: "#a08c6a"
@@ -14,6 +14,9 @@ style:
         title_font_size: "26px"
         text_font_size: "17px"
         h2_font_size: "19px"
+        h3_font_size: "18px"
+        h4_font_size: "17px"
+        padding: "20px 16px"
         cover_label: "中华典故 · 历史长卷"
         footer: "泛黄旧卷 · 品读千古"
         ending_lines: []

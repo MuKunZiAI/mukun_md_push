@@ -410,8 +410,10 @@ SqlNode node = parser.parseQuery();
 | `h2_frame_border` | `accent` | `framed_pill` 左边框颜色 |
 | `h2_frame_border_width` | `5px` | `framed_pill` 左边框宽度 |
 | `h2_frame_radius` | `4px` | `framed_pill` 圆角半径 |
-| `h3_color` | `#333` | H3 子标题文字颜色 |
-| `h4_color` | `#555` | H4 小标题文字颜色 |
+| `h3_font_size` | `20px` | H3 子标题字号 |
+| `h3_color` | `#000000` | H3 子标题文字颜色 |
+| `h4_font_size` | `18px` | H4 小标题字号 |
+| `h4_color` | `#000000` | H4 小标题文字颜色 |
 | `p_indent` | `0` | 正文段落首行缩进（如 `2em` 启用学术体缩进） |
 | `hero_style` | `default` | 封面样式：`default`（色块卡片）/ `minimal`（极简左对齐大标题） |
 | `font_family` | 系统中文字体栈 | 页面字体栈 |
@@ -671,6 +673,31 @@ mukun_md_push/
 
 ## 📋 修改说明
 
+### 2026-06-17
+
+- **微信编辑器内联渲染修复：从嵌套结构改为并列结构**  
+  修复 Markdown 中 `**粗体**` 行内样式在微信编辑器中丢失的问题。根本原因是 `_render_tokens()` 的 text 渲染时会在 bold 内层再次包裹 `<span leaf=""><span textstyle="">`，形成内层覆盖外层 font-weight 的嵌套结构，导致加粗效果被 `<span textstyle="" style="letter-spacing:2px">` 的默认 font-weight 覆盖。  
+  **修复方案**：`is_inside=True` 时 text 直接输出 `escape_html` 后的文本，不再生成任何包裹，使 bold 内部仅由外层的 `font-weight:bold` 决定粗细。link 内部同理，保持纯文本输出。  
+  **对比**：  
+  ```html
+  <!-- 嵌套结构（错误：内层 textstyle 覆盖外层 font-weight） -->
+  <span leaf=""><span textstyle="" style="letter-spacing:2px;font-weight:bold">
+    <span textstyle="" style="letter-spacing:2px">粗体文字</span>
+  </span></span>
+  
+  <!-- 并列结构（正确：text 不再包裹，font-weight 由外层控制） -->
+  <span leaf=""><span textstyle="" style="letter-spacing:2px;font-weight:bold">粗体文字</span></span>
+  ```
+  **并列结构原则**：当外层已经生成了 `<span leaf="">` 或 `<a>` 时，内层的 text 不生成任何包裹，只输出 escaped 文本。避免多层 `<span>` 嵌套导致的 CSS 优先级冲突和编辑器识别问题。
+  
+- **H3 / H4 样式完全配置化**：将 H3 的 `font-size` 和 `color` 从硬编码改为从 `s` 读取（`h3_font_size` / `h3_color`），H4 的 `color` 同样改为从 `s` 读取（`h4_color`）。默认值为：H3 `20px` + `#000000` 黑色加粗，H4 `18px` + `#000000` 黑色加粗，正文 `16px` + `#555555`。所有字段均可通过 `~/.md_push_wechat/config.yaml` 或 `--config` 配置文件覆盖。README 配置项表格同步修正默认值（`h3_color` 和 `h4_color` 从 `#333`/`#555` 修正为 `#000000`，新增 `h3_font_size` / `h4_font_size` 条目）
+
+- **H3 / H4 标题嵌套修复**：H3 和 H4 从 `format_text()` 改为 `escape_html()`，消除外层 `<span leaf="">` 与 `format_text` 生成的内层 `<span leaf="">` 的嵌套
+
+- **代码块缩进双重修复**：
+  1. **最小公共缩进去除**：`highlight_code()` 中新增最小公共缩进检测与去除逻辑。代码块在 Markdown 中常被嵌套在列表或引用块中（如 `1. ```python` 开头），此时代码行会带有多余的列表缩进前缀。通过计算所有非空行的最小行首空格数，统一去掉该前缀，保留代码内部的相对缩进层级，避免代码块显示时整体向右偏移
+  2. **前导空格转 `&nbsp;` 实体**：`render_code_block()` 中每行 token 的文本在 escape_html 后，将空格替换为 `&nbsp;` 实体。微信编辑器编辑模式下 `white-space:pre` 会被 strip，但 `&nbsp;` 作为 HTML 实体不会被折叠，既保留缩进视觉效果又不破坏横向滚动
+
 ### 2026-06-09
 
 - **新增「紫绿清韵」预设样式**：第 7 种文章模式预设，致敬「码上菩提」公众号的双色技术博客风格。H2 用浅紫底 + 紫文字 + 紫色 5px 左粗边 + 4px 圆角胶囊框；H3 用翠绿加粗（`#2e7d32`）；正文 15px + 首行缩进 2em；封面采用极简模式（白底黑色大标题，左对齐，无装饰）。配置文件 `references/article_scholar.yaml`，触发词：清韵 / 紫绿 / 紫绿清韵 / 紫胶囊 / 紫色胶囊 / 紫框 / 双色 / 双色对比 / 技术博客 / 深度技术 / 研究笔记 / 思辨 / 学术 / 学者 / 码上菩提
@@ -780,7 +807,6 @@ mukun_md_push/
 ### 2026-05-23
 
 - **CSS 内联优化**：将 `text-indent`、`font-size`、`color`、`line-height` 等可继承属性提升到父级 `<body>`/`<section>`，减少重复声明。日报模式节省 10.4%，AI 模式节省 4.5%，长文模式节省 6.2%
-- **超长文章自动拆分**：HTML 超过 20000 字符时按段落边界自动拆分为多篇，合并到同一个草稿推送，标题自动追加（上/中/下）后缀，智能截断保留后缀（`_truncate_title()`）
 - **样式配置外部化**：`md2wechat_html.py` 新增 `load_style_config()` 从 `~/.md_push_wechat/config.yaml` 读取 `style` 节点覆盖内置默认值，支持 daily/ai/essay 三种模式独立配色，纯字符串解析 YAML 不引入额外依赖
 - **`--config` 参数**：`md2wechat_html.py` 支持通过 `--config <path>` 指定任意配色配置文件
 - **修复代码块缩进丢失**：`parse_essay()` 收集代码块行时改用 `raw`（保留行首空格），修复 YAML、文件树等缩进代码渲染后缩进丢失的问题

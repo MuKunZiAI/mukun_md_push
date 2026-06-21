@@ -14,6 +14,8 @@ style:
         title_font_size: "25px"
         text_font_size: "16px"
         h2_font_size: "30px"
+        h3_font_size: "17px"
+        h4_font_size: "16px"
         cover_label: "COLUMN NOTE"
         footer: ""
         h2_style: "quote_line"
